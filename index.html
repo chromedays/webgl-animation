@@ -1,0 +1,286 @@
+<html>
+
+<head>
+    <style>
+        #mycanvas {
+            border: 1px solid red;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="mycanvas" width="640" height="480">
+    </canvas>
+    <script id="model" src="model.json"></script>
+    <script>
+        let canvas = document.querySelector('#mycanvas');
+        let gl = canvas.getContext('webgl');
+        gl.getExtension('OES_element_index_uint');
+        console.log(model);
+
+        function createShaderProgram(params) {
+            let vertShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertShader, params.vert);
+            gl.compileShader(vertShader);
+
+            let fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragShader, params.frag);
+            gl.compileShader(fragShader);
+
+            let shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertShader);
+            gl.attachShader(shaderProgram, fragShader);
+            gl.linkProgram(shaderProgram);
+
+            let numUniforms = gl.getProgramParameter(shaderProgram, gl.ACTIVE_UNIFORMS);
+
+            gl.useProgram(shaderProgram);
+
+            let meta = {};
+            for (let i = 0; i < numUniforms; ++i) {
+                let info = gl.getActiveUniform(shaderProgram, i);
+                meta[info.name] = {
+                    location: gl.getUniformLocation(shaderProgram, info.name),
+                    type: info.type,
+                    size: info.size,
+                };
+            }
+
+            gl.useProgram(null);
+
+            return {
+                handle: shaderProgram,
+                meta: meta,
+            };
+        }
+
+        function vec3Sub(a, b) {
+            return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        }
+
+        function vec3Divf(v, s) {
+            return [v[0] / s, v[1] / s, v[2] / s];
+        }
+
+        function vec3Dot(a, b) {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        };
+
+        function vec3Cross(a, b) {
+            return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        }
+
+        function vec3Length(v) {
+            return Math.sqrt(vec3Dot(v, v));
+        }
+
+        function vec3Normalize(v) {
+            return vec3Divf(v, vec3Length(v));
+        }
+
+        function mat4Identity() {
+            return [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1,
+            ];
+        }
+
+        function mat4Multiply(a, b) {
+            return [
+                a[0] * b[0] + a[4] * b[1] + a[8] * b[2] + a[12] * b[3],
+                a[1] * b[0] + a[5] * b[1] + a[9] * b[2] + a[13] * b[3],
+                a[2] * b[0] + a[6] * b[1] + a[10] * b[2] + a[14] * b[3],
+                a[3] * b[0] + a[7] * b[1] + a[11] * b[2] + a[15] * b[3],
+                a[0] * b[4] + a[4] * b[5] + a[8] * b[6] + a[12] * b[7],
+                a[1] * b[4] + a[5] * b[5] + a[9] * b[6] + a[13] * b[7],
+                a[2] * b[4] + a[6] * b[5] + a[10] * b[6] + a[14] * b[7],
+                a[3] * b[4] + a[7] * b[5] + a[11] * b[6] + a[15] * b[7],
+                a[0] * b[8] + a[4] * b[9] + a[8] * b[10] + a[12] * b[11],
+                a[1] * b[8] + a[5] * b[9] + a[9] * b[10] + a[13] * b[11],
+                a[2] * b[8] + a[6] * b[9] + a[10] * b[10] + a[14] * b[11],
+                a[3] * b[8] + a[7] * b[9] + a[11] * b[10] + a[15] * b[11],
+                a[0] * b[12] + a[4] * b[13] + a[8] * b[14] + a[12] * b[15],
+                a[1] * b[12] + a[5] * b[13] + a[9] * b[14] + a[13] * b[15],
+                a[2] * b[12] + a[6] * b[13] + a[10] * b[14] + a[14] * b[15],
+                a[3] * b[12] + a[7] * b[13] + a[11] * b[14] + a[15] * b[15]
+            ];
+        }
+
+        function mat4Translate(pos) {
+            return [
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                pos[0], pos[1], pos[2], 1,
+            ];
+        }
+
+        function mat4Scale(scale) {
+            return [
+                scale[0], 0, 0, 0,
+                0, scale[1], 0, 0,
+                0, 0, scale[2], 0,
+                0, 0, 0, 1,
+            ];
+        }
+
+        function mat4LookAt(eye, target, upAxis) {
+            let look = vec3Normalize(vec3Sub(eye, target));
+            let right = vec3Normalize(vec3Cross(upAxis, look));
+            let up = vec3Normalize(vec3Cross(look, right));
+
+            return [
+                right[0], up[0], look[0], 0,
+                right[1], up[1], look[1], 0,
+                right[2], up[2], look[2], 0,
+                -vec3Dot(right, eye), -vec3Dot(up, eye), -vec3Dot(look, eye), 1,
+            ];
+        }
+
+        function mat4Perspective() {
+            let fov = 60;
+            let a = canvas.width / canvas.height;
+            let near = 0.1;
+            let far = 1000;
+            let d = 1 / Math.tan(fov * 0.5 * Math.PI / 180);
+            return [
+                d / a, 0, 0, 0,
+                0, d, 0, 0,
+                0, 0, -(far + near) / (far - near), -1,
+                0, 0, (-2 * far * near) / (far - near), 0
+            ];
+        }
+
+        function setUniforms(shaderProgram, uniforms) {
+            for (key in uniforms) {
+                let value = uniforms[key];
+                let info = shaderProgram.meta[key];
+                if (info.type === gl.FLOAT_MAT4) {
+                    gl.uniformMatrix4fv(info.location, false, value);
+                }
+            }
+        };
+
+        // let vertices =
+        //     [-0.5, -0.5,
+        //         0.5, -0.5,
+        //         0.5, 0.5,
+        //     -0.5, 0.5];
+        // let indices = [
+        //     0, 1, 2, 2, 3, 0,
+        // ];
+
+        let vertices = [];
+        let normals = [];
+        let indices = [];
+        let mesh = model.meshes[2];
+        for (let i = 0; i < mesh.faces.length; ++i) {
+            indices.push(...mesh.faces[i]);
+        }
+        for (let i = 0; i < mesh.vertices.length; i += 3) {
+            let v = mesh.vertices;
+            let n = mesh.normals;
+
+            vertices.push(v[i]);
+            vertices.push(v[i + 1]);
+            vertices.push(v[i + 2]);
+            normals.push(n[i]);
+            normals.push(n[i + 1]);
+            normals.push(n[i + 2]);
+        }
+
+        let vb = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        let vbNormals = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, vbNormals);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        let ib = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(indices), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+        let shaderProgram = createShaderProgram({
+            vert: ` 
+            uniform mat4 uModelMat;
+            uniform mat4 uViewMat;
+            uniform mat4 uProjMat;
+
+            attribute vec3 aPos;
+            attribute vec3 aNormal;
+
+            varying vec3 vNormal;
+            void main() {
+                gl_Position = uProjMat * uViewMat * uModelMat * vec4(aPos, 1);
+                vNormal = aNormal;
+            }`,
+            frag: `
+            precision mediump float;
+
+            varying vec3 vNormal;
+
+            void main() {
+                gl_FragColor = vec4((vNormal + vec3(1)) * 0.5, 1);
+                // gl_FragColor = vec4(1, 0, 0, 1);
+            }`
+        });
+
+        let oldTime = 0;
+        let s = 0;
+
+
+        let draw = function (time) {
+            let dt = time - oldTime;
+            oldTime = time;
+
+            s = Math.sin(time * 0.001);
+            // uniforms.uModelMat = mat4Translate([s, 0, 0]),
+
+            gl.clearColor(0.9, 0.9, 0.8, 1);
+            gl.enable(gl.DEPTH_TEST);
+            gl.enable(gl.CULL_FACE);
+            gl.cullFace(gl.BACK);
+            gl.frontFace(gl.CCW);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+
+            gl.useProgram(shaderProgram.handle);
+            gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+            let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbNormals);
+            let aNormal = gl.getAttribLocation(shaderProgram.handle, 'aNormal');
+            gl.enableVertexAttribArray(aNormal);
+            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+
+            let uniforms = {
+                uModelMat: mat4Multiply(mat4Translate([s, 5, 0]), mat4Scale([0.4, 0.4, 0.4])),
+                uViewMat: mat4LookAt([0, 0, 0], [0, 1, 0], [0, 0, 1]),
+                uProjMat: mat4Perspective(),
+            };
+            setUniforms(shaderProgram, uniforms);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+
+            window.requestAnimationFrame(draw);
+        };
+
+        draw(0);
+    </script>
+</body>
+
+</html>
