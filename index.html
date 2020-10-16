@@ -145,6 +145,15 @@
             ];
         }
 
+        function mat4Transpose(m) {
+            return [
+                m[0], m[4], m[8], m[12],
+                m[1], m[5], m[9], m[13],
+                m[2], m[6], m[10], m[14],
+                m[3], m[7], m[11], m[15],
+            ];
+        }
+
         function mat4Translate(pos) {
             return [
                 1, 0, 0, 0,
@@ -238,10 +247,12 @@
 
         function setUniforms(shaderProgram, uniforms) {
             for (key in uniforms) {
-                let value = uniforms[key];
-                let info = shaderProgram.meta[key];
-                if (info.type === gl.FLOAT_MAT4) {
-                    gl.uniformMatrix4fv(info.location, false, value);
+                if (key in shaderProgram.meta) {
+                    let value = uniforms[key];
+                    let info = shaderProgram.meta[key];
+                    if (info.type === gl.FLOAT_MAT4) {
+                        gl.uniformMatrix4fv(info.location, false, value);
+                    }
                 }
             }
         };
@@ -257,6 +268,8 @@
 
         let meshes = [];
 
+        let boneMap = new Map();
+
         for (let i = 0; i < model.meshes.length; ++i) {
             let meshData = model.meshes[i];
             let mesh = {
@@ -266,30 +279,50 @@
                 boneWeights: [],
                 numBones: [],
                 indices: [],
+                boneTransforms: [],
                 vb: {
-                    pos: 0,
-                    normal: 0,
-                    boneIndices: 0,
-                    boneWeights: 0,
+                    pos: null,
+                    normal: null,
+                    boneIndices: null,
+                    boneWeights: null,
                 },
-                ib: 0,
+                ib: null,
             };
 
-            for (let i = 0; i < meshData.faces.length; ++i) {
-                mesh.indices.push(...meshData.faces[i]);
+            for (let j = 0; j < meshData.faces.length; ++j) {
+                mesh.indices.push(...meshData.faces[j]);
             }
-            for (let i = 0; i < meshData.vertices.length; i += 3) {
+            for (let j = 0; j < meshData.vertices.length; j += 3) {
                 let v = meshData.vertices;
                 let n = meshData.normals;
 
-                mesh.positions.push(v[i], v[i + 1], v[i + 2]);
-                mesh.normals.push(n[i], n[i + 1], n[i + 2]);
+                mesh.positions.push(v[j], v[j + 1], v[j + 2]);
+                mesh.normals.push(n[j], n[j + 1], n[j + 2]);
 
                 mesh.boneIndices.push(0, 0, 0, 0);
-                mesh.boneWeights.push(0, 0, 0, 0);
+                mesh.boneWeights.push(1, 0, 0, 0);
                 mesh.numBones.push(0);
             }
 
+            if ('bones' in meshData) {
+                for (let j = 0; j < meshData.bones.length; ++j) {
+                    let bone = meshData.bones[j];
+                    boneMap.set(bone.name, {
+                        mesh: i,
+                        bone: j,
+                    });
+
+                    mesh.boneTransforms.push(mat4Identity());
+
+                    for (let k = 0; k < bone.weights.length; ++k) {
+                        let w = bone.weights[k];
+                        let vi = w[0] * 4 + mesh.numBones[w[0]];
+                        ++mesh.numBones[w[0]];
+                        mesh.boneIndices[vi] = j;
+                        mesh.boneWeights[vi] = w[1];
+                    }
+                }
+            }
 
             mesh.vb.pos = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb.pos);
@@ -316,15 +349,36 @@
 
             meshes.push(mesh);
         }
+        
+        function buildBoneAux(node, parentTransform) {
+            let transform = mat4Multiply(parentTransform, mat4Transpose(node.transformation));
+            //transform = mat4Transpose(node.transformation);
+
+            if (boneMap.has(node.name)) {
+                let boneInfo = boneMap.get(node.name);
+                meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = transform;
+            }
+            if ('children' in node) {
+                for (let i = 0; i < node.children.length; ++i) {
+                    buildBoneAux(node.children[i], transform);
+                }
+            }
+        }
+
+        buildBoneAux(model.rootnode, mat4Identity());
+
+        console.log(meshes);
 
         // vertex attributes
-        // pos | normal | boneIndices | boneWeight 
+        // pos | normal | boneIndices | boneWeight | numBones?
 
         let shaderProgram = createShaderProgram({
             vert: ` 
             uniform mat4 uModelMat;
             uniform mat4 uViewMat;
             uniform mat4 uProjMat;
+            #define MAX_NUM_BONES 16
+            uniform mat4 uBones[MAX_NUM_BONES];
 
             attribute vec3 aPos;
             attribute vec3 aNormal;
@@ -332,8 +386,15 @@
             attribute vec4 aBoneWeights;
 
             varying vec3 vNormal;
+
             void main() {
-                gl_Position = uProjMat * uViewMat * uModelMat * vec4(aPos, 1);
+                mat4 boneMat =
+                uBones[int(aBoneIndices.x)] * aBoneWeights.x +
+                uBones[int(aBoneIndices.y)] * aBoneWeights.y +
+                uBones[int(aBoneIndices.z)] * aBoneWeights.z +
+                uBones[int(aBoneIndices.w)] * aBoneWeights.w;
+                // boneMat = uBones[int(aBoneIndices.w)];
+                gl_Position = uProjMat * uViewMat * uModelMat * boneMat * vec4(aPos, 1);
                 vNormal = aNormal;
             }`,
             frag: `
@@ -343,7 +404,6 @@
 
             void main() {
                 gl_FragColor = vec4((vNormal + vec3(1)) * 0.5, 1);
-                // gl_FragColor = vec4(1, 0, 0, 1);
             }`
         });
 
@@ -358,7 +418,7 @@
 
             gl.clearColor(0.9, 0.9, 0.8, 1);
             gl.enable(gl.DEPTH_TEST);
-            gl.enable(gl.CULL_FACE);
+            gl.disable(gl.CULL_FACE);
             gl.cullFace(gl.BACK);
             gl.frontFace(gl.CCW);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -366,37 +426,62 @@
 
             gl.useProgram(shaderProgram.handle);
 
+            let camDistance = 200;
+            let camPos = [camDistance * Math.sin(time * 0.001), camDistance * Math.cos(time* 0.001), 0];
+            let camDir = [0, 1, 0];
+
             let uniforms = {
                 uModelMat: mat4Multiply(mat4Translate([s, 5, 0]), mat4Scale([0.4, 0.4, 0.4])),
-                uViewMat: mat4LookAt([0, 0, 0], [0, 1, 0], [0, 0, 1]),
+                uViewMat: mat4LookAt(camPos, [0, 0, 0], [0, 0, 1]),
                 uProjMat: mat4Perspective(),
             };
-            setUniforms(shaderProgram, uniforms);
+
 
             for (let i = 0; i < meshes.length; ++i) {
                 let vb = meshes[i].vb;
                 let ib = meshes[i].ib;
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, vb.pos);
+                if (meshes[i].boneTransforms.length > 0) {
+                    let matrices = [];
+                    for (let j = 0; j < meshes[i].boneTransforms.length; ++j) {
+                        matrices.push(...meshes[i].boneTransforms[j]);
+                    }
+                    uniforms['uBones[0]'] = matrices;
+                } else {
+                    uniforms['uBones[0]'] = mat4Identity();
+                }
+                let identityArray = [];
+                for (let j = 0; j < 16; ++j) {
+                    identityArray.push(...mat4Identity());
+                }
+                // uniforms['uBones[0]'] = identityArray;
+                
+                setUniforms(shaderProgram, uniforms);
+
                 let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
-                gl.enableVertexAttribArray(aPos);
-                gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+                if (aPos >= 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.pos);
+                    gl.enableVertexAttribArray(aPos);
+                    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+                }
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, vb.normal);
                 let aNormal = gl.getAttribLocation(shaderProgram.handle, 'aNormal');
-                gl.enableVertexAttribArray(aNormal);
-                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                if (aNormal >= 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.normal);
+                    gl.enableVertexAttribArray(aNormal);
+                    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+                }
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneIndices);
                 let aBoneIndices = gl.getAttribLocation(shaderProgram.handle, 'aBoneIndices');
-                if (aBoneIndices > 0) {
+                if (aBoneIndices >= 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneIndices);
                     gl.enableVertexAttribArray(aBoneIndices);
                     gl.vertexAttribPointer(aBoneIndices, 4, gl.FLOAT, false, 0, 0);
                 }
 
-                gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneWeights);
                 let aBoneWeights = gl.getAttribLocation(shaderProgram.handle, 'aBoneWeights');
-                if (aBoneWeights > 0) {
+                if (aBoneWeights >= 0) {
+                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneWeights);
                     gl.enableVertexAttribArray(aBoneWeights);
                     gl.vertexAttribPointer(aBoneWeights, 4, gl.FLOAT, false, 0, 0);
                 }
