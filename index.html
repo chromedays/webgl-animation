@@ -60,8 +60,20 @@
             };
         }
 
+        function vec3Negate(v) {
+            return [-v[0], -v[1], -v[2]];
+        }
+
+        function vec3Add(a, b) {
+            return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+        }
+
         function vec3Sub(a, b) {
             return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+        }
+
+        function vec3Mulf(v, s) {
+            return [v[0] * s, v[1] * s, v[2] * s];
         }
 
         function vec3Divf(v, s) {
@@ -82,6 +94,25 @@
 
         function vec3Normalize(v) {
             return vec3Divf(v, vec3Length(v));
+        }
+
+        function vec3RotateByQuat(v, q) {
+        }
+
+        function vec4Add(a, b) {
+            return [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]];
+        }
+
+        function vec4Sub(a, b) {
+            return [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]];
+        }
+
+        function vec4Mulf(v, s) {
+            return [v[0] * s, v[1] * s, v[2] * s, v[3] * s];
+        }
+
+        function vec4Dot(a, b) {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
         }
 
         function mat4Identity() {
@@ -159,6 +190,52 @@
             ];
         }
 
+        function quatGetScalarPart(q) {
+            return q[3];
+        }
+
+        function quatGetImaginaryPart(q) {
+            return q.slice(0, 3);
+        }
+
+        function quat(s, v) {
+            return [...v, s];
+        }
+
+        function quatIdentity() {
+            return quat(1, [0, 0, 0]);
+        }
+
+        function quatMultiply(a, b) {
+            let s0 = quatGetScalarPart(a);
+            let v0 = quatGetImaginaryPart(a);
+            let s1 = quatGetScalarPart(b);
+            let v1 = quatGetImaginaryPart(b);
+            let s = s0 * s1 - vec3Dot(v0, v1);
+            let v = vec3Add(vec3Add(vec3Mulf(v1, s0), vec3Mulf(v0, s1)), vec3Cross(v0, v1));
+            return quat(s, v);
+        }
+
+        function quatConjugate(q) {
+            return quat(vec3Negate(quatGetImaginaryPart(q)), quatGetScalarPart(q));
+        }
+
+        function quatRotateAroundAxis(axis, angle) {
+            let halfAngle = angle * 0.5;
+            return quat(Math.cos(halfAngle), vec3Mulf(vec3Normalize(axis), Math.sin(halfAngle)));
+        }
+
+        /*
+        function quatRotateToVec3(from, to) {
+            let axis = vec3Cross(from, to);
+            let angle = Math.acos(vec3dot(from, to)) / vec3Length(to);
+        }
+        */
+
+        function quatToMat4(q) {
+
+        }
+
         function setUniforms(shaderProgram, uniforms) {
             for (key in uniforms) {
                 let value = uniforms[key];
@@ -169,7 +246,7 @@
             }
         };
 
-        // let vertices =
+        // let positions =
         //     [-0.5, -0.5,
         //         0.5, -0.5,
         //         0.5, 0.5,
@@ -178,39 +255,70 @@
         //     0, 1, 2, 2, 3, 0,
         // ];
 
-        let vertices = [];
-        let normals = [];
-        let indices = [];
-        let mesh = model.meshes[2];
-        for (let i = 0; i < mesh.faces.length; ++i) {
-            indices.push(...mesh.faces[i]);
+        let meshes = [];
+
+        for (let i = 0; i < model.meshes.length; ++i) {
+            let meshData = model.meshes[i];
+            let mesh = {
+                positions: [],
+                normals: [],
+                boneIndices: [],
+                boneWeights: [],
+                numBones: [],
+                indices: [],
+                vb: {
+                    pos: 0,
+                    normal: 0,
+                    boneIndices: 0,
+                    boneWeights: 0,
+                },
+                ib: 0,
+            };
+
+            for (let i = 0; i < meshData.faces.length; ++i) {
+                mesh.indices.push(...meshData.faces[i]);
+            }
+            for (let i = 0; i < meshData.vertices.length; i += 3) {
+                let v = meshData.vertices;
+                let n = meshData.normals;
+
+                mesh.positions.push(v[i], v[i + 1], v[i + 2]);
+                mesh.normals.push(n[i], n[i + 1], n[i + 2]);
+
+                mesh.boneIndices.push(0, 0, 0, 0);
+                mesh.boneWeights.push(0, 0, 0, 0);
+                mesh.numBones.push(0);
+            }
+
+
+            mesh.vb.pos = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb.pos);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.positions), gl.STATIC_DRAW);
+
+            mesh.vb.normal = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb.normal);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.normals), gl.STATIC_DRAW);
+
+            mesh.vb.boneIndices = gl.createBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb.boneIndices);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.boneIndices), gl.STATIC_DRAW);
+
+            mesh.vb.boneWeights = gl.createBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, mesh.vb.boneWeights);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.boneWeights), gl.STATIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+            mesh.ib = gl.createBuffer();
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.ib);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+
+            meshes.push(mesh);
         }
-        for (let i = 0; i < mesh.vertices.length; i += 3) {
-            let v = mesh.vertices;
-            let n = mesh.normals;
 
-            vertices.push(v[i]);
-            vertices.push(v[i + 1]);
-            vertices.push(v[i + 2]);
-            normals.push(n[i]);
-            normals.push(n[i + 1]);
-            normals.push(n[i + 2]);
-        }
-
-        let vb = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        let vbNormals = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vbNormals);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        let ib = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(indices), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        // vertex attributes
+        // pos | normal | boneIndices | boneWeight 
 
         let shaderProgram = createShaderProgram({
             vert: ` 
@@ -220,6 +328,8 @@
 
             attribute vec3 aPos;
             attribute vec3 aNormal;
+            attribute vec4 aBoneIndices;
+            attribute vec4 aBoneWeights;
 
             varying vec3 vNormal;
             void main() {
@@ -240,13 +350,11 @@
         let oldTime = 0;
         let s = 0;
 
-
         let draw = function (time) {
             let dt = time - oldTime;
             oldTime = time;
 
             s = Math.sin(time * 0.001);
-            // uniforms.uModelMat = mat4Translate([s, 0, 0]),
 
             gl.clearColor(0.9, 0.9, 0.8, 1);
             gl.enable(gl.DEPTH_TEST);
@@ -257,15 +365,6 @@
             gl.viewport(0, 0, canvas.width, canvas.height);
 
             gl.useProgram(shaderProgram.handle);
-            gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-            let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
-            gl.enableVertexAttribArray(aPos);
-            gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, vbNormals);
-            let aNormal = gl.getAttribLocation(shaderProgram.handle, 'aNormal');
-            gl.enableVertexAttribArray(aNormal);
-            gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
 
             let uniforms = {
                 uModelMat: mat4Multiply(mat4Translate([s, 5, 0]), mat4Scale([0.4, 0.4, 0.4])),
@@ -273,8 +372,39 @@
                 uProjMat: mat4Perspective(),
             };
             setUniforms(shaderProgram, uniforms);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_INT, 0);
+
+            for (let i = 0; i < meshes.length; ++i) {
+                let vb = meshes[i].vb;
+                let ib = meshes[i].ib;
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, vb.pos);
+                let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
+                gl.enableVertexAttribArray(aPos);
+                gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, vb.normal);
+                let aNormal = gl.getAttribLocation(shaderProgram.handle, 'aNormal');
+                gl.enableVertexAttribArray(aNormal);
+                gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneIndices);
+                let aBoneIndices = gl.getAttribLocation(shaderProgram.handle, 'aBoneIndices');
+                if (aBoneIndices > 0) {
+                    gl.enableVertexAttribArray(aBoneIndices);
+                    gl.vertexAttribPointer(aBoneIndices, 4, gl.FLOAT, false, 0, 0);
+                }
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneWeights);
+                let aBoneWeights = gl.getAttribLocation(shaderProgram.handle, 'aBoneWeights');
+                if (aBoneWeights > 0) {
+                    gl.enableVertexAttribArray(aBoneWeights);
+                    gl.vertexAttribPointer(aBoneWeights, 4, gl.FLOAT, false, 0, 0);
+                }
+
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+                gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
+
+            }
 
             window.requestAnimationFrame(draw);
         };
