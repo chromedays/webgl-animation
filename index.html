@@ -257,6 +257,15 @@
             }
         };
 
+        function setAttribute(shaderProgram, attribName, buffer, numComponents) {
+            let location = gl.getAttribLocation(shaderProgram.handle, attribName);
+            if (location >= 0) {
+                gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                gl.enableVertexAttribArray(location);
+                gl.vertexAttribPointer(location, numComponents, gl.FLOAT, false, 0, 0);
+            }
+        }
+
         // let positions =
         //     [-0.5, -0.5,
         //         0.5, -0.5,
@@ -368,9 +377,6 @@
 
         console.log(meshes);
 
-        // vertex attributes
-        // pos | normal | boneIndices | boneWeight | numBones?
-
         let shaderProgram = createShaderProgram({
             vert: ` 
             precision mediump float;
@@ -394,7 +400,7 @@
                 uBones[int(aBoneIndices.y)] * aBoneWeights.y +
                 uBones[int(aBoneIndices.z)] * aBoneWeights.z +
                 uBones[int(aBoneIndices.w)] * aBoneWeights.w;
-                // boneMat = uBones[1];
+
                 gl_Position = uProjMat * uViewMat * uModelMat * boneMat * vec4(aPos, 1);
                 vNormal = aNormal;
             }`,
@@ -419,7 +425,7 @@
 
             gl.clearColor(0.9, 0.9, 0.8, 1);
             gl.enable(gl.DEPTH_TEST);
-            gl.disable(gl.CULL_FACE);
+            gl.enable(gl.CULL_FACE);
             gl.cullFace(gl.BACK);
             gl.frontFace(gl.CCW);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -427,11 +433,11 @@
 
             gl.useProgram(shaderProgram.handle);
 
-            let camDistance = 100;
-            let camPos = [camDistance * Math.sin(time * 0.001), 40, camDistance * Math.cos(time * 0.001)];
+            let camDistance = 300;
+            let camPos = [camDistance * Math.sin(time * 0.001), 100, camDistance * Math.cos(time * 0.001)];
 
             let uniforms = {
-                uModelMat: mat4Multiply(mat4Translate([s, 5, 0]), mat4Scale([0.4, 0.4, 0.4])),
+                uModelMat: mat4Identity(),
                 uViewMat: mat4LookAt(camPos, [0, camPos[1], 0], [0, 1, 0]),
                 uProjMat: mat4Perspective(),
             };
@@ -447,47 +453,20 @@
                     }
                     uniforms['uBones[0]'] = matrices;
                 } else {
-                    uniforms['uBones[0]'] = mat4Identity();
+                    let identityArray = [];
+                    for (let j = 0; j < 16; ++j) {
+                        identityArray.push(...mat4Identity());
+                    }
+                    uniforms['uBones[0]'] = identityArray;
                 }
-                let identityArray = [];
-                for (let j = 0; j < 16; ++j) {
-                    identityArray.push(...mat4Identity());
-                }
-                // uniforms['uBones[0]'] = identityArray;
 
                 setUniforms(shaderProgram, uniforms);
-
-                let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
-                if (aPos >= 0) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.pos);
-                    gl.enableVertexAttribArray(aPos);
-                    gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
-                }
-
-                let aNormal = gl.getAttribLocation(shaderProgram.handle, 'aNormal');
-                if (aNormal >= 0) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.normal);
-                    gl.enableVertexAttribArray(aNormal);
-                    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
-                }
-
-                let aBoneIndices = gl.getAttribLocation(shaderProgram.handle, 'aBoneIndices');
-                if (aBoneIndices >= 0) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneIndices);
-                    gl.enableVertexAttribArray(aBoneIndices);
-                    gl.vertexAttribPointer(aBoneIndices, 4, gl.FLOAT, false, 0, 0);
-                }
-
-                let aBoneWeights = gl.getAttribLocation(shaderProgram.handle, 'aBoneWeights');
-                if (aBoneWeights >= 0) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, vb.boneWeights);
-                    gl.enableVertexAttribArray(aBoneWeights);
-                    gl.vertexAttribPointer(aBoneWeights, 4, gl.FLOAT, false, 0, 0);
-                }
-
+                setAttribute(shaderProgram, 'aPos', vb.pos, 3);
+                setAttribute(shaderProgram, 'aNormal', vb.normal, 3);
+                setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4);
+                setAttribute(shaderProgram, 'aBoneWeights', vb.boneWeights, 4);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
                 gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
-
             }
 
             window.requestAnimationFrame(draw);
