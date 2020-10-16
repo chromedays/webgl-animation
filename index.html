@@ -349,14 +349,13 @@
 
             meshes.push(mesh);
         }
-        
+
         function buildBoneAux(node, parentTransform) {
             let transform = mat4Multiply(parentTransform, mat4Transpose(node.transformation));
-            //transform = mat4Transpose(node.transformation);
 
             if (boneMap.has(node.name)) {
                 let boneInfo = boneMap.get(node.name);
-                meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = transform;
+                meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
             }
             if ('children' in node) {
                 for (let i = 0; i < node.children.length; ++i) {
@@ -374,6 +373,8 @@
 
         let shaderProgram = createShaderProgram({
             vert: ` 
+            precision mediump float;
+
             uniform mat4 uModelMat;
             uniform mat4 uViewMat;
             uniform mat4 uProjMat;
@@ -393,7 +394,7 @@
                 uBones[int(aBoneIndices.y)] * aBoneWeights.y +
                 uBones[int(aBoneIndices.z)] * aBoneWeights.z +
                 uBones[int(aBoneIndices.w)] * aBoneWeights.w;
-                // boneMat = uBones[int(aBoneIndices.w)];
+                // boneMat = uBones[1];
                 gl_Position = uProjMat * uViewMat * uModelMat * boneMat * vec4(aPos, 1);
                 vNormal = aNormal;
             }`,
@@ -426,16 +427,14 @@
 
             gl.useProgram(shaderProgram.handle);
 
-            let camDistance = 200;
-            let camPos = [camDistance * Math.sin(time * 0.001), camDistance * Math.cos(time* 0.001), 0];
-            let camDir = [0, 1, 0];
+            let camDistance = 100;
+            let camPos = [camDistance * Math.sin(time * 0.001), 40, camDistance * Math.cos(time * 0.001)];
 
             let uniforms = {
                 uModelMat: mat4Multiply(mat4Translate([s, 5, 0]), mat4Scale([0.4, 0.4, 0.4])),
-                uViewMat: mat4LookAt(camPos, [0, 0, 0], [0, 0, 1]),
+                uViewMat: mat4LookAt(camPos, [0, camPos[1], 0], [0, 1, 0]),
                 uProjMat: mat4Perspective(),
             };
-
 
             for (let i = 0; i < meshes.length; ++i) {
                 let vb = meshes[i].vb;
@@ -455,7 +454,7 @@
                     identityArray.push(...mat4Identity());
                 }
                 // uniforms['uBones[0]'] = identityArray;
-                
+
                 setUniforms(shaderProgram, uniforms);
 
                 let aPos = gl.getAttribLocation(shaderProgram.handle, 'aPos');
