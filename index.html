@@ -15,6 +15,9 @@
 </head>
 
 <body>
+    <button id="prevkey">Prev Key</button>
+    <button id="nextkey">Next Key</button>
+    <div id="framerate"></div>
     <canvas id="mycanvas" width="640" height="480">
     </canvas>
     <script id="model" src="model.json"></script>
@@ -97,6 +100,10 @@
         }
 
         function vec3RotateByQuat(v, q) {
+        }
+
+        function vec4Negate(v) {
+            return [-v[0], -v[1], -v[2], -v[3]];
         }
 
         function vec4Add(a, b) {
@@ -242,7 +249,28 @@
         */
 
         function quatToMat4(q) {
+            return [
+                1 - 2 * (q[1] * q[1] + q[2] * q[2]), 2 * (q[0] * q[1] + q[3] * q[2]), 2 * (q[0] * q[2] - q[3] * q[1]), 0,
+                2 * (q[0] * q[1] - q[3] * q[2]), 1 - 2 * (q[0] * q[0] + q[2] * q[2]), 2 * (q[1] * q[2] + q[3] * q[0]), 0,
+                2 * (q[0] * q[2] + q[3] * q[1]), 2 * (q[1] * q[2] - q[3] * q[0]), 1 - 2 * (q[0] * q[0] + q[1] * q[1]), 0,
+                0, 0, 0, 1,
+            ];
+        }
 
+        function vec3Lerp(a, b, t) {
+            return vec3Add(vec3Mulf(a, 1 - t), vec3Mulf(b, t));
+        }
+
+        function quatSlerp(a, b, t) {
+            let d = vec4Dot(a, b);
+            if (d < 0) {
+                d = -d;
+                a = vec4Negate(a);
+            }
+
+            let angle = Math.acos(d);
+
+            return vec4Mulf(vec4Add(vec4Mulf(a, Math.sin((1 - t) * angle)), vec4Mulf(b, Math.sin(t * angle))), 1 / Math.sin(angle));
         }
 
         function setUniforms(shaderProgram, uniforms) {
@@ -359,22 +387,6 @@
             meshes.push(mesh);
         }
 
-        function buildBoneAux(node, parentTransform) {
-            let transform = mat4Multiply(parentTransform, mat4Transpose(node.transformation));
-
-            if (boneMap.has(node.name)) {
-                let boneInfo = boneMap.get(node.name);
-                meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
-            }
-            if ('children' in node) {
-                for (let i = 0; i < node.children.length; ++i) {
-                    buildBoneAux(node.children[i], transform);
-                }
-            }
-        }
-
-        buildBoneAux(model.rootnode, mat4Identity());
-
         console.log(meshes);
 
         let shaderProgram = createShaderProgram({
@@ -414,18 +426,131 @@
             }`
         });
 
+        let anim = model.animations[2];
+        let channelMap = new Map();
+        for (let i = 0; i < anim.channels.length; ++i) {
+            channelMap.set(anim.channels[i].name, anim.channels[i]);
+        }
+
+        let currentTick = 0;
+
+        function buildAnimBoneAux(node, parentTransform) {
+            let transform = parentTransform;
+
+            if (channelMap.has(node.name)) {
+                let channel = channelMap.get(node.name);
+                let v = channel.positionkeys[0][1];
+                if (channel.positionkeys.length > 1) {
+                    let currentKeyIndex = 0;
+                    let nextKeyIndex = 0;
+                    for (let i = 0; i < channel.positionkeys.length - 1; ++i) {
+                        if (currentTick < channel.positionkeys[i + 1][0]) {
+                            currentKeyIndex = i;
+                            break;
+                        }
+                    }
+                    nextKeyIndex = currentKeyIndex + 1;
+                    let currentKey = channel.positionkeys[currentKeyIndex];
+                    let nextKey = channel.positionkeys[nextKeyIndex];
+
+                    let t = (currentTick - currentKey[0]) / (nextKey[0] - currentKey[0]);
+                    console.assert(t >= 0 && t <= 1, 'what?');
+                    v = vec3Lerp(currentKey[1], nextKey[1], t);
+                }
+                let q = [channel.rotationkeys[0][1][1],
+                channel.rotationkeys[0][1][2],
+                channel.rotationkeys[0][1][3],
+                channel.rotationkeys[0][1][0],
+                ];
+                if (channel.rotationkeys.length > 1) {
+                    let currentKeyIndex = 0;
+                    let nextKeyIndex = 0;
+                    for (let i = 0; i < channel.rotationkeys.length - 1; ++i) {
+                        if (currentTick < channel.rotationkeys[i + 1][0]) {
+                            currentKeyIndex = i;
+                            break;
+                        }
+                    }
+                    nextKeyIndex = currentKeyIndex + 1;
+                    let currentKey = channel.rotationkeys[currentKeyIndex];
+                    let nextKey = channel.rotationkeys[nextKeyIndex];
+                    // console.log(currentKey, nextKey);
+                    let t = (currentTick - currentKey[0]) / (nextKey[0] - currentKey[0]);
+                    console.assert(t >= 0 && t <= 1, 'what?');
+                    q = quatSlerp([currentKey[1][1], currentKey[1][2], currentKey[1][3], currentKey[1][0]], [nextKey[1][1], nextKey[1][2], nextKey[1][3], nextKey[1][0]], t);
+                    //q = quatSlerp(currentKey[1], nextKey[1], t);
+                }
+                let s = channel.scalingkeys[0][1];
+                if (channel.scalingkeys.length > 1) {
+                    let currentKeyIndex = 0;
+                    let nextKeyIndex = 0;
+                    for (let i = 0; i < channel.scalingkeys.length - 1; ++i) {
+                        if (currentTick < channel.scalingkeys[i + 1][0]) {
+                            currentKeyIndex = i;
+                            break;
+                        }
+                    }
+                    nextKeyIndex = currentKeyIndex + 1;
+                    let currentKey = channel.scalingkeys[currentKeyIndex];
+                    let nextKey = channel.scalingkeys[nextKeyIndex];
+                    // console.log(currentKey, nextKey);
+                    let t = (currentTick - currentKey[0]) / (nextKey[0] - currentKey[0]);
+                    console.assert(t >= 0 && t <= 1, 'what?');
+                    s = vec3Lerp(currentKey[1], nextKey[1], t);
+                }
+
+                let localTransform = mat4Multiply(mat4Translate(v), mat4Multiply(quatToMat4(q), mat4Scale(s)));
+                transform = mat4Multiply(transform, localTransform);
+            } else {
+                transform = mat4Multiply(transform, mat4Transpose(node.transformation));
+            }
+            if (boneMap.has(node.name)) {
+                let boneInfo = boneMap.get(node.name);
+                meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
+            }
+            if ('children' in node) {
+                for (let i = 0; i < node.children.length; ++i) {
+                    buildAnimBoneAux(node.children[i], transform);
+                }
+            }
+        }
+
+
+        let nextkeyButton = document.querySelector('#nextkey');
+        nextkeyButton.addEventListener('click', () => {
+            currentTick = (currentTick + 1) % anim.duration;
+        });
+        let prevkeybutton = document.querySelector('#prevkey');
+        prevkeybutton.addEventListener('click', () => {
+            currentTick = (currentTick - 1);
+            if (currentTick < 0) {
+                currentTick = anim.duration - 1;
+            }
+        });
+
         let oldTime = 0;
         let s = 0;
 
+        let framerateDisplayTimer = 1;
+
         let draw = function (time) {
-            let dt = time - oldTime;
+            let dt = (time - oldTime) * 0.001;
+            framerateDisplayTimer += dt;
+            if (framerateDisplayTimer > 1) {
+                framerateDisplayTimer -= 1;
+                document.querySelector('#framerate').textContent = 'Framerate: ' + (1 / dt).toFixed(2);
+            }
             oldTime = time;
+            // currentTick = (time * 0.001 * anim.tickspersecond) % anim.duration;
+            // console.log(currentTick);
+
+            buildAnimBoneAux(model.rootnode, mat4Identity());
 
             s = Math.sin(time * 0.001);
 
             gl.clearColor(0.9, 0.9, 0.8, 1);
             gl.enable(gl.DEPTH_TEST);
-            gl.enable(gl.CULL_FACE);
+            gl.disable(gl.CULL_FACE);
             gl.cullFace(gl.BACK);
             gl.frontFace(gl.CCW);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
