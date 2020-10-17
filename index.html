@@ -24,6 +24,10 @@
 
             padding: 3;
         }
+
+        #cam_angle {
+            width: 100%;
+        }
     </style>
 </head>
 
@@ -37,6 +41,15 @@
         <label for="draw_model">Draw Model</label>
         <input type="checkbox" id="draw_bones">
         <label for="draw_bones">Draw Bones</label>
+    </div>
+    <hr class="dotted">
+
+    <div>
+        Camera Orbit Angle:
+        <input type="range" min="0" max="1799" value="0" id="cam_angle">
+    </div>
+    <div>
+        *Use mouse wheel to adjust view distance
     </div>
 
     <hr class="dotted">
@@ -688,6 +701,22 @@
 
         let framerateDisplayTimer = 1;
 
+        let camDistance = 300;
+        let camAngle = 0;
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camDistance += e.deltaY / 10;
+            if (camDistance < 50) {
+                camDistance = 50;
+            }
+        })
+
+        let camAngleSlider = document.querySelector('#cam_angle');
+        camAngleSlider.addEventListener('input', (e) => {
+            camAngle = e.target.value / 180 * Math.PI;
+        });
+
         let draw = function (time) {
             let dt = (time - oldTime) * 0.001;
             framerateDisplayTimer += dt;
@@ -711,8 +740,7 @@
             gl.viewport(0, 0, canvas.width, canvas.height);
 
 
-            let camDistance = 300;
-            let camPos = [camDistance * Math.sin(time * 0.001), 100, camDistance * Math.cos(time * 0.001)];
+            let camPos = [camDistance * Math.sin(camAngle), 120, camDistance * Math.cos(camAngle)];
 
             let uniforms = {
                 uModelMat: mat4Identity(),
