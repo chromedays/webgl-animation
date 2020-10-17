@@ -11,11 +11,35 @@
             right: 0;
             margin: auto;
         }
+
+        body {
+            font-family: system, -apple-system, ".SFNSText-Regular", "San Francisco", "Roboto", "Segoe UI", "Helvetica Neue", "Lucida Grande", sans-serif;
+            font-weight: 100;
+        }
+
+        label {
+            border: 1px solid black;
+            color: black;
+            background-color: lightgray;
+
+            padding: 3;
+        }
     </style>
 </head>
 
 <body>
-    <div id="animation_selector"></div>
+    <div id="animation_selector">Select Animation: </div>
+
+    <hr class="dotted">
+    <div>
+        Visibility Options:
+        <input type="checkbox" id="draw_model" checked>
+        <label for="draw_model">Draw Model</label>
+        <input type="checkbox" id="draw_bones">
+        <label for="draw_bones">Draw Bones</label>
+    </div>
+
+    <hr class="dotted">
     <div id="framerate"></div>
     <canvas id="mycanvas" width="640" height="480">
     </canvas>
@@ -507,20 +531,10 @@
             }`
         });
 
-        let boneBuffers = [];
-        for (let i = 0; i < meshes.length; ++i) {
-            let mesh = meshes[i];
-
-            let boneBuffer = {
-                vb: gl.createBuffer(),
-                numVertices: 0,
-            };
-
-            boneBuffer.numVertices = meshes[i].boneTransforms.length;
-
-            boneBuffers.push(boneBuffer);
-        }
-
+        let boneBuffer = {
+            vb: gl.createBuffer(),
+            vertices: [],
+        };
 
         let currAnim = model.animations[2];
         let channelMap = new Map();
@@ -613,18 +627,64 @@
             }
         }
 
+        function buildBoneVerticesAux(node) {
+            if (boneMap.has(node.name)) {
+                let boneInfo = boneMap.get(node.name);
+                let t = meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone];
+                let v0 = [t[12], t[13], t[14]];
+                if ('children' in node) {
+                    for (let i = 0; i < node.children.length; ++i) {
+                        let child = node.children[i];
+                        if (boneMap.has(child.name)) {
+                            let boneInfo = boneMap.get(child.name);
+                            let t = meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone];
+                            let v1 = [t[12], t[13], t[14]];
+                            boneBuffer.vertices.push(...v0);
+                            boneBuffer.vertices.push(...v1);
+                        }
+                    }
+                }
+            }
+
+            if ('children' in node) {
+                for (let i = 0; i < node.children.length; ++i) {
+                    buildBoneVerticesAux(node.children[i]);
+                }
+            }
+        }
+
+        function buildBoneVertices() {
+            boneBuffer.vertices = [];
+            buildBoneVerticesAux(model.rootnode);
+            gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boneBuffer.vertices), gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        }
 
         let animSelector = document.querySelector("#animation_selector");
         let buttons = '';
         for (let i = 0; i < model.animations.length; ++i) {
+
             let anim = model.animations[i];
-            let button = document.createElement('button');
-            button.innerHTML = anim.name;
+            let button = document.createElement('input');
+            button.id = anim.name;
+            button.setAttribute('type', 'radio');
+            button.setAttribute('name', 'anim');
+            if (currAnim === anim) {
+                button.checked = true;
+            }
+            let label = document.createElement('label');
+            label.setAttribute('for', button.id);
+            label.innerHTML = anim.name;
             button.addEventListener('click', () => {
                 currAnim = anim;
             });
             animSelector.appendChild(button);
+            animSelector.appendChild(label);
         }
+
+        let drawModelButton = document.querySelector("#draw_model");
+        let drawBonesButton = document.querySelector("#draw_bones");
 
         let oldTime = 0;
         let s = 0;
@@ -690,22 +750,21 @@
                 setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4);
                 setAttribute(shaderProgram, 'aBoneWeights', vb.boneWeights, 4);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-                gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
+                if (drawModelButton.checked) {
+                    gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
+                }
 
-                if (boneBuffers[i].numVertices > 0) {
-                    gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffers[i].vb);
-                    let vertices = [];
-                    for (let j = 0; j < meshes[i].boneTransforms.length; ++j) {
-                        let transform = meshes[i].boneTransformsWithoutOffset[j];
-                        vertices.push(transform[12], transform[13], transform[14]);
-                    }
-                    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
+                buildBoneVertices();
+                if (boneBuffer.vertices.length > 0) {
+                    gl.disable(gl.DEPTH_TEST);
                     gl.useProgram(debugBonesShaderProgram.handle);
                     setUniforms(debugBonesShaderProgram, uniforms);
-                    setAttribute(debugBonesShaderProgram, 'aPos', boneBuffers[i].vb, 3);
-                    //gl.disable(gl.DEPTH_TEST);
-                    gl.drawArrays(gl.POINTS, 0, boneBuffers[i].numVertices);
-                    //gl.enable(gl.DEPTH_TEST);
+                    gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb);
+                    setAttribute(debugBonesShaderProgram, 'aPos', boneBuffer.vb, 3);
+                    if (drawBonesButton.checked) {
+                        gl.drawArrays(gl.LINES, 0, boneBuffer.vertices.length);
+                    }
+                    gl.enable(gl.DEPTH_TEST);
                 }
             }
 
