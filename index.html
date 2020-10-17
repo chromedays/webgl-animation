@@ -632,18 +632,15 @@
                 let boneInfo = boneMap.get(node.name);
                 let t = meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone];
                 let v0 = [t[12], t[13], t[14]];
-                if ('children' in node) {
-                    for (let i = 0; i < node.children.length; ++i) {
-                        let child = node.children[i];
-                        if (boneMap.has(child.name)) {
-                            let boneInfo = boneMap.get(child.name);
-                            let t = meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone];
-                            let v1 = [t[12], t[13], t[14]];
-                            boneBuffer.vertices.push(...v0);
-                            boneBuffer.vertices.push(...v1);
-                        }
-                    }
-                }
+                let v1 = vec3Add(v0, [t[1], t[5], t[9]]);
+                boneBuffer.vertices.push(...v0);
+                boneBuffer.vertices.push(...v1);
+                v1 = vec3Add(v0, [t[0], t[4], t[8]]);
+                boneBuffer.vertices.push(...v0);
+                boneBuffer.vertices.push(...v1);
+                v1 = vec3Add(v0, [t[2], t[6], t[10]]);
+                boneBuffer.vertices.push(...v0);
+                boneBuffer.vertices.push(...v1);
             }
 
             if ('children' in node) {
