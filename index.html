@@ -3,7 +3,6 @@
 <head>
     <style>
         #mycanvas {
-            border: 1px solid red;
             position: absolute;
             top: 0;
             bottom: 0;
@@ -30,42 +29,75 @@
         }
 
         input#tick {
-            width: 30%;
+            width: 100%;
+        }
+
+        #sidebar {
+            position: absolute;
+            margin: auto;
+            border: 1px solid red;
+            width: 25%;
+        }
+
+        #sidebar,
+        div {
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+
+        .sidebar_block,
+        div {
+            margin-top: 10px;
         }
     </style>
 </head>
 
 <body>
-    <div id="animation_selector">Select Animation: </div>
-
-    <hr class="dotted">
-    <div>
-        Visibility Options:
-        <input type="checkbox" id="draw_model" checked>
-        <label for="draw_model">Draw Model</label>
-        <input type="checkbox" id="draw_bones">
-        <label for="draw_bones">Draw Bones</label>
-    </div>
-    <hr class="dotted">
-
-    <div>
-        Camera Orbit Angle:
-        <input type="range" min="0" max="1799" value="0" id="cam_angle">
-    </div>
-    <div>
-        *Use mouse wheel to adjust view distance
-    </div>
-
-    <hr class="dotted">
-    <div>
-        Tick:
-        <input type="range" min="0" max="999" value="0" id="tick">
-    </div>
-
-    <hr class="dotted">
-    <div id="framerate"></div>
     <canvas id="mycanvas" width="640" height="480">
     </canvas>
+    <div id="sidebar">
+        <div id="animation_selector" class="sidebar_block">
+            <div>Select Animation: </div>
+        </div>
+
+        <hr class="dotted">
+        <div>
+            <div>
+                Visibility Options:
+            </div>
+            <div>
+                <input type="checkbox" id="draw_model" checked>
+                <label for="draw_model">Draw Model</label>
+            </div>
+            <div>
+                <input type="checkbox" id="draw_bones">
+                <label for="draw_bones">Draw Bones</label>
+            </div>
+        </div>
+        <hr class="dotted">
+
+        <div>
+            Camera Orbit Angle:
+            <input type="range" min="0" max="1799" value="0" id="cam_angle">
+        </div>
+        <div>
+            *Use mouse wheel to adjust view distance
+        </div>
+
+        <hr class="dotted">
+        <div>
+            Tick:
+            <input type="range" min="0" max="999" value="0" id="tick">
+        </div>
+
+        <hr class="dotted">
+        <div id="framerate"></div>
+
+        <hr class="dotted">
+        <div id="node_hierarchy">
+
+        </div>
+    </div>
     <script id="model" src="model.json"></script>
     <script>
         let canvas = document.querySelector('#mycanvas');
@@ -357,7 +389,7 @@
         //         0.5, 0.5,
         //     -0.5, 0.5];
         // let indices = [
-        //     0, 1, 2, 2, 3, 0,
+        //     0, 1, 2, 2, 3, 0,    
         // ];
 
         let meshes = [];
@@ -660,42 +692,6 @@
             }
         }
 
-        function buildBoneAxisVerticesAux(node) {
-
-            if (boneMap.has(node.name)) {
-                let boneInfo = boneMap.get(node.name);
-                let t = meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone];
-                let v0 = [t[12], t[13], t[14]];
-                let v1 = vec3Add(v0, [t[1], t[5], t[9]]);
-                boneBuffer.positions.push(...v0);
-                boneBuffer.colors.push(1, 0.5, 0.5);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-                boneBuffer.positions.push(...v1);
-                boneBuffer.colors.push(0.5, 0.5, 1);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-                v1 = vec3Add(v0, [t[0], t[4], t[8]]);
-                boneBuffer.positions.push(...v0);
-                boneBuffer.colors.push(1, 0.5, 0.5);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-                boneBuffer.positions.push(...v1);
-                boneBuffer.colors.push(0.5, 0.5, 1);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-                v1 = vec3Add(v0, [t[2], t[6], t[10]]);
-                boneBuffer.positions.push(...v0);
-                boneBuffer.colors.push(1, 0.5, 0.5);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-                boneBuffer.positions.push(...v1);
-                boneBuffer.colors.push(0.5, 0.5, 1);
-                boneBuffer.indices.push(boneBuffer.indices.length);
-            }
-
-            if ('children' in node) {
-                for (let i = 0; i < node.children.length; ++i) {
-                    buildBoneAxisVerticesAux(node.children[i]);
-                }
-            }
-        }
-
         let tempFlag = false;
         function buildBoneVerticesAux(parentTransform, node, depth) {
             function pushVertex(pos, color) {
@@ -732,7 +728,6 @@
             boneBuffer.colors = [];
             boneBuffer.indices = [];
             buildBoneVerticesAux(null, model.rootnode, 0);
-            //buildBoneAxisVerticesAux(model.rootnode);
             gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb.pos);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boneBuffer.positions), gl.STATIC_DRAW);
             gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb.color);
@@ -748,6 +743,7 @@
         for (let i = 0; i < model.animations.length; ++i) {
 
             let anim = model.animations[i];
+            let div = document.createElement('div');
             let button = document.createElement('input');
             button.id = anim.name;
             button.setAttribute('type', 'radio');
@@ -762,8 +758,9 @@
                 currAnim = anim;
                 currentTick = 0;
             });
-            animSelector.appendChild(button);
-            animSelector.appendChild(label);
+            div.appendChild(button);
+            div.appendChild(label);
+            animSelector.appendChild(div);
         }
 
         let drawModelButton = document.querySelector("#draw_model");
