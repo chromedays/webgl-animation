@@ -75,15 +75,6 @@
                 <label for="draw_bones">Draw Bones</label>
             </div>
         </div>
-        <hr class="dotted">
-
-        <div>
-            Camera Orbit Angle:
-            <input type="range" min="0" max="1799" value="0" id="cam_angle">
-        </div>
-        <div>
-            *Use mouse wheel to adjust view distance
-        </div>
 
         <hr class="dotted">
         <div>
@@ -780,7 +771,6 @@
         let framerateDisplayTimer = 1;
 
         let camDistance = 300;
-        let camAngle = 0;
 
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -789,12 +779,6 @@
                 //camDistance = 50;
             }
         })
-
-        let camAngleSlider = document.querySelector('#cam_angle');
-        camAngleSlider.addEventListener('input', (e) => {
-            camAngle = e.target.value / 180 * Math.PI;
-        });
-
 
         let tickSlider = document.querySelector('#tick');
         tickSlider.addEventListener('input', e => {
