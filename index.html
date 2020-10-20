@@ -33,6 +33,7 @@
         }
 
         #sidebar {
+            background-color: white;
             position: absolute;
             margin: auto;
             border: 1px solid red;
@@ -53,7 +54,7 @@
 </head>
 
 <body>
-    <canvas id="mycanvas" width="640" height="480">
+    <canvas id="mycanvas" width="640" height="640">
     </canvas>
     <div id="sidebar">
         <div id="animation_selector" class="sidebar_block">
@@ -86,17 +87,18 @@
 
         <hr class="dotted">
         <div>
-            Tick:
-            <input type="range" min="0" max="999" value="0" id="tick">
+            <div>
+                <input type="checkbox" id="auto_play_anim">
+                <label for="auto_play_anim">Auto Play</label>
+            </div>
+            <div>
+                Tick:
+                <input type="range" min="0" max="999" value="0" id="tick">
+            </div>
         </div>
 
         <hr class="dotted">
         <div id="framerate"></div>
-
-        <hr class="dotted">
-        <div id="node_hierarchy">
-
-        </div>
     </div>
     <script id="model" src="model.json"></script>
     <script>
@@ -611,7 +613,7 @@
 
         let currentTick = 0;
 
-        function buildAnimBoneAux(node, parentTransform) {
+        function getNodeTransform(node, parentTransform) {
             let transform = parentTransform;
 
             if (channelMap.has(node.name)) {
@@ -680,6 +682,13 @@
             } else {
                 transform = mat4Multiply(transform, mat4Transpose(node.transformation));
             }
+
+            return transform;
+        }
+
+        function buildAnimBoneAux(node, parentTransform) {
+            let transform = getNodeTransform(node, parentTransform);
+
             if (boneMap.has(node.name)) {
                 let boneInfo = boneMap.get(node.name);
                 meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
@@ -706,12 +715,11 @@
                 tempFlag = false;
             }
 
-            parentTransform = parentTransform ? parentTransform : mat4Identity();
             pushVertex([parentTransform[12], parentTransform[13], parentTransform[14]],
-                [1, 0.5, 0.5]);
-            let transform = mat4Multiply(parentTransform, mat4Transpose(node.transformation));
+                [1, 1, 0]);
+            let transform = getNodeTransform(node, parentTransform);
             pushVertex([transform[12], transform[13], transform[14]],
-                [0.5, 0.5, 1]);
+                [1, 1, 0]);
 
             if (node.name.includes('root')) {
                 tempFlag = true;
@@ -727,7 +735,7 @@
             boneBuffer.positions = [];
             boneBuffer.colors = [];
             boneBuffer.indices = [];
-            buildBoneVerticesAux(null, model.rootnode, 0);
+            buildBoneVerticesAux(mat4Identity(), model.rootnode, 0);
             gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb.pos);
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boneBuffer.positions), gl.STATIC_DRAW);
             gl.bindBuffer(gl.ARRAY_BUFFER, boneBuffer.vb.color);
@@ -787,11 +795,38 @@
             camAngle = e.target.value / 180 * Math.PI;
         });
 
-        document.querySelector('#tick').addEventListener('input', e => {
+
+        let tickSlider = document.querySelector('#tick');
+        tickSlider.addEventListener('input', e => {
             currentTick = e.target.value / 1000 * currAnim.duration;
         });
 
-        let animTimer = 0;
+        let autoPlayAnim = document.querySelector("#auto_play_anim");
+
+        let mousePressed = false;
+
+        canvas.addEventListener('mousedown', () => {
+            mousePressed = true;
+        });
+
+        let camTheta = 90;
+        let camPhi = 0;
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (mousePressed) {
+                camPhi += e.movementX;
+                camTheta -= e.movementY;
+                if (camTheta < 1) {
+                    camTheta = 1;
+                } else if (camTheta > 179) {
+                    camTheta = 179;
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            mousePressed = false;
+        });
 
         let draw = function (time) {
             let dt = (time - oldTime) * 0.001;
@@ -802,8 +837,11 @@
             }
             oldTime = time;
 
-            //currentTick += (dt * currAnim.tickspersecond);
-            //currentTick %= currAnim.duration;
+            if (autoPlayAnim.checked) {
+                currentTick += (dt * currAnim.tickspersecond);
+                currentTick %= currAnim.duration;
+            }
+            tickSlider.value = currentTick / currAnim.duration * 1000;
 
             buildAnimBoneAux(model.rootnode, mat4Identity());
 
@@ -817,17 +855,18 @@
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             gl.viewport(0, 0, canvas.width, canvas.height);
 
-
-            let camPos = [camDistance * Math.sin(camAngle), 120, camDistance * Math.cos(camAngle)];
+            let camPos = [0, 0, 0];
+            camPos[0] = Math.sin(camTheta * Math.PI / 180) * Math.cos(camPhi * Math.PI / 180) * camDistance;
+            camPos[1] = 100 + Math.cos(camTheta * Math.PI / 180) * camDistance;
+            camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
             let uniforms = {
                 uModelMat: mat4Identity(),
-                uViewMat: mat4LookAt(camPos, [0, camPos[1], 0], [0, 1, 0]),
+                uViewMat: mat4LookAt(camPos, [0, 100, 0], [0, 1, 0]),
                 uProjMat: mat4Perspective(),
             };
 
             for (let i = 0; i < meshes.length; ++i) {
-                //    { let i = 2;
                 gl.useProgram(shaderProgram.handle);
 
                 let vb = meshes[i].vb;
