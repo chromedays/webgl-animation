@@ -1,5 +1,11 @@
+
+
 async function main() {
     let model = await loadModel();
+    console.log(model);
+
+    let scene = parseScene(model);
+    console.log(scene);
 
     let meshes = [];
     let boneTransformsTable = new Map();
@@ -366,9 +372,6 @@ async function main() {
                 }
             } else {
                 boneMatrices.push(...mat4Identity());
-                for (let j = 0; j < 16; ++j) {
-                    boneMatrices.push(...mat4Identity());
-                }
             }
 
             gl.enable(gl.DEPTH_TEST);
