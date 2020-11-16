@@ -2,6 +2,7 @@ async function main() {
     let model = await loadModel();
 
     let meshes = [];
+    let boneTransformsTable = new Map();
 
     let boneMap = new Map();
 
@@ -14,8 +15,8 @@ async function main() {
             boneWeights: [],
             numBones: [],
             indices: [],
-            boneTransforms: [],
-            boneTransformsWithoutOffset: [],
+            // boneTransforms: [],
+            // boneTransformsWithoutOffset: [],
             vb: {
                 pos: null,
                 normal: null,
@@ -24,6 +25,8 @@ async function main() {
             },
             ib: null,
         };
+
+        let boneTransforms = [];
 
         for (let j = 0; j < meshData.faces.length; ++j) {
             mesh.indices.push(...meshData.faces[j]);
@@ -48,7 +51,8 @@ async function main() {
                     bone: j,
                 });
 
-                mesh.boneTransforms.push(mat4Identity());
+                // mesh.boneTransforms.push(mat4Identity());
+                boneTransforms.push(mat4Identity());
 
                 for (let k = 0; k < bone.weights.length; ++k) {
                     let w = bone.weights[k];
@@ -84,6 +88,10 @@ async function main() {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
         meshes.push(mesh);
+
+        if (boneTransforms.length > 0) {
+            boneTransformsTable.set(i, boneTransforms);
+        }
     }
 
     let shaderProgram = await createShaderProgramFromFiles('shaders/default.vert', 'shaders/default.frag');
@@ -186,8 +194,10 @@ async function main() {
 
         if (boneMap.has(node.name)) {
             let boneInfo = boneMap.get(node.name);
-            meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
-            meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone] = transform;
+            // meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
+            boneTransformsTable.get(boneInfo.mesh)[boneInfo.bone] =
+                mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
+            // meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone] = transform;
         }
         if ('children' in node) {
             for (let i = 0; i < node.children.length; ++i) {
@@ -361,10 +371,13 @@ async function main() {
             let ib = meshes[i].ib;
 
 
-            if (meshes[i].boneTransforms.length > 0) {
+            if (boneTransformsTable.has(i)) {
+                // if (meshes[i].boneTransforms.length > 0) {
                 let matrices = [];
-                for (let j = 0; j < meshes[i].boneTransforms.length; ++j) {
-                    matrices.push(...meshes[i].boneTransforms[j]);
+                // for (let j = 0; j < meshes[i].boneTransforms.length; ++j) {
+                for (let j = 0; j < boneTransformsTable.get(i).length; ++j) {
+                    // matrices.push(...meshes[i].boneTransforms[j]);
+                    matrices.push(...boneTransformsTable.get(i)[j]);
                 }
                 uniforms['uBones[0]'] = matrices;
             } else {
