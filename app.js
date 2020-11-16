@@ -349,11 +349,9 @@ async function main() {
         camPos[1] = 100 + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
-        let uniforms = {
-            uModelMat: mat4Identity(),
-            uViewMat: mat4LookAt(camPos, [0, 100, 0], [0, 1, 0]),
-            uProjMat: mat4Perspective(),
-        };
+        let modelMat = mat4Identity();
+        let viewMat = mat4LookAt(camPos, [0, 100, 0], [0, 1, 0]);
+        let projMat = mat4Perspective();
 
         for (let i = 0; i < meshes.length; ++i) {
             gl.useProgram(shaderProgram.handle);
@@ -361,24 +359,27 @@ async function main() {
             let vb = meshes[i].vb;
             let ib = meshes[i].ib;
 
-
+            let boneMatrices = [];
             if (boneTransformsTable.has(i)) {
-                let matrices = [];
                 for (let j = 0; j < boneTransformsTable.get(i).length; ++j) {
-                    matrices.push(...boneTransformsTable.get(i)[j]);
+                    boneMatrices.push(...boneTransformsTable.get(i)[j]);
                 }
-                uniforms['uBones[0]'] = matrices;
             } else {
-                let identityArray = [];
+                boneMatrices.push(...mat4Identity());
                 for (let j = 0; j < 16; ++j) {
-                    identityArray.push(...mat4Identity());
+                    boneMatrices.push(...mat4Identity());
                 }
-                uniforms['uBones[0]'] = identityArray;
             }
 
             gl.enable(gl.DEPTH_TEST);
 
-            setUniforms(shaderProgram, uniforms);
+            setUniforms(shaderProgram, {
+                'uBones[0]': boneMatrices,
+                'uModelMat': modelMat,
+                'uViewMat': viewMat,
+                'uProjMat': projMat,
+            });
+
             setAttribute(shaderProgram, 'aPos', vb.pos, 3);
             setAttribute(shaderProgram, 'aNormal', vb.normal, 3);
             setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4);
@@ -392,7 +393,11 @@ async function main() {
             if (boneBuffer.positions.length > 0) {
                 gl.disable(gl.DEPTH_TEST);
                 gl.useProgram(debugBonesShaderProgram.handle);
-                setUniforms(debugBonesShaderProgram, uniforms);
+                setUniforms(debugBonesShaderProgram, {
+                    'uModelMat': modelMat,
+                    'uViewMat': viewMat,
+                    'uProjMat': projMat,
+                });
                 setAttribute(debugBonesShaderProgram, 'aPos', boneBuffer.vb.pos, 3);
                 setAttribute(debugBonesShaderProgram, 'aColor', boneBuffer.vb.color, 3);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boneBuffer.ib);
