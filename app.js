@@ -15,8 +15,6 @@ async function main() {
             boneWeights: [],
             numBones: [],
             indices: [],
-            // boneTransforms: [],
-            // boneTransformsWithoutOffset: [],
             vb: {
                 pos: null,
                 normal: null,
@@ -51,7 +49,6 @@ async function main() {
                     bone: j,
                 });
 
-                // mesh.boneTransforms.push(mat4Identity());
                 boneTransforms.push(mat4Identity());
 
                 for (let k = 0; k < bone.weights.length; ++k) {
@@ -174,7 +171,6 @@ async function main() {
                 nextKeyIndex = currentKeyIndex + 1;
                 let currentKey = channel.scalingkeys[currentKeyIndex];
                 let nextKey = channel.scalingkeys[nextKeyIndex];
-                // console.log(currentKey, nextKey);
                 let t = (currentTick - currentKey[0]) / (nextKey[0] - currentKey[0]);
                 console.assert(t >= 0 && t <= 1, 'what?');
                 s = vec3Lerp(currentKey[1], nextKey[1], t);
@@ -194,10 +190,8 @@ async function main() {
 
         if (boneMap.has(node.name)) {
             let boneInfo = boneMap.get(node.name);
-            // meshes[boneInfo.mesh].boneTransforms[boneInfo.bone] = mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
             boneTransformsTable.get(boneInfo.mesh)[boneInfo.bone] =
                 mat4Multiply(transform, mat4Transpose(model.meshes[boneInfo.mesh].bones[boneInfo.bone].offsetmatrix));
-            // meshes[boneInfo.mesh].boneTransformsWithoutOffset[boneInfo.bone] = transform;
         }
         if ('children' in node) {
             for (let i = 0; i < node.children.length; ++i) {
@@ -289,9 +283,6 @@ async function main() {
     canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
         camDistance += e.deltaY / 10;
-        if (camDistance < 50) {
-            //camDistance = 50;
-        }
     })
 
     let tickSlider = document.querySelector('#tick');
@@ -372,11 +363,8 @@ async function main() {
 
 
             if (boneTransformsTable.has(i)) {
-                // if (meshes[i].boneTransforms.length > 0) {
                 let matrices = [];
-                // for (let j = 0; j < meshes[i].boneTransforms.length; ++j) {
                 for (let j = 0; j < boneTransformsTable.get(i).length; ++j) {
-                    // matrices.push(...meshes[i].boneTransforms[j]);
                     matrices.push(...boneTransformsTable.get(i)[j]);
                 }
                 uniforms['uBones[0]'] = matrices;
