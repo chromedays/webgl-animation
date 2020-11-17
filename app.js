@@ -1,5 +1,5 @@
-var spector = new SPECTOR.Spector();
-spector.displayUI();
+
+
 async function main() {
     let model = await loadModel();
     console.log(model);
