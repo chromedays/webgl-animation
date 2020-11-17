@@ -283,56 +283,133 @@ function interpolateKeyframes(keyframes, tick, lerpFunc) {
     return value;
 }
 
-function drawScene(scene, shaderProgram, viewMat, projMat, animIndex, tick) {
+class SceneState {
+    animIndex = -1;
+    tick = 0;
+    drawBones = false;
+    nodeTransforms = [];
+    boneTransforms = [];
+
+    updateTransforms(scene) {
+        this.nodeTransforms = scene.nodes.map(_ => mat4Identity());
+        this.boneTransforms = scene.meshes.map(mesh => {
+            if (mesh.bones.length > 0) {
+                return mesh.bones.map(_ => mat4Identity());
+            } else {
+                return [mat4Identity()];
+            }
+        });
+
+        let anim = this.animIndex >= 0 ? scene.animations[this.animIndex] : null;
+
+        scene.nodes.forEach((node, nodeIndex) => {
+            if (node.hasParent()) {
+                if (anim && anim.channels.has(node.name)) {
+                    let channel = anim.channels.get(node.name);
+                    let v = interpolateKeyframes(channel.positionKeys, this.tick, vec3Lerp);
+                    let q = interpolateKeyframes(channel.rotationKeys, this.tick, quatSlerp);
+                    let s = interpolateKeyframes(channel.scalingKeys, this.tick, vec3Lerp);
+                    let localTransform = mat4Multiply(mat4Translate(v), mat4Multiply(quatToMat4(q), mat4Scale(s)));
+                    this.nodeTransforms[nodeIndex] = mat4Multiply(this.nodeTransforms[node.parentIndex], localTransform);
+                } else {
+                    this.nodeTransforms[nodeIndex] = mat4Multiply(this.nodeTransforms[node.parentIndex], node.transform);
+                }
+            } else {
+                this.nodeTransforms[nodeIndex] = node.transform;
+            }
+
+            if (node.hasBone()) {
+                let mesh = scene.meshes[node.meshIndices[0]];
+                let bone = mesh.bones[node.boneIndex];
+                this.boneTransforms[node.meshIndices[0]][node.boneIndex] =
+                    mat4Multiply(this.nodeTransforms[nodeIndex], bone.offsetMat);
+            }
+        });
+    }
+};
+
+function drawScene(scene, shaderProgram, viewMat, projMat, state) {
     gl.useProgram(shaderProgram.handle);
     gl.enable(gl.DEPTH_TEST);
     setUniforms(shaderProgram, {
+        'uModelMat': mat4Identity(),
         'uViewMat': viewMat,
         'uProjMat': projMat,
     });
 
-    let nodeTransforms = scene.nodes.map(_ => mat4Identity());
-    let boneTransforms = scene.meshes.map(mesh => {
-        if (mesh.bones.length > 0) {
-            return mesh.bones.map(_ => mat4Identity());
-        } else {
-            return [mat4Identity()];
-        }
-    });
-
-    let anim = scene.animations[animIndex];
-
-    scene.nodes.forEach((node, nodeIndex) => {
-        if (node.hasParent()) {
-            if (anim.channels.has(node.name)) {
-                let channel = anim.channels.get(node.name);
-                let v = interpolateKeyframes(channel.positionKeys, tick, vec3Lerp);
-                let q = interpolateKeyframes(channel.rotationKeys, tick, quatSlerp);
-                let s = interpolateKeyframes(channel.scalingKeys, tick, vec3Lerp);
-                // console.log(v, q, s);
-                let localTransform = mat4Multiply(mat4Translate(v), mat4Multiply(quatToMat4(q), mat4Scale(s)));
-                nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], localTransform);
-            } else {
-                nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], node.transform);
-            }
-        } else {
-            nodeTransforms[nodeIndex] = node.transform;
-        }
-
-        if (node.hasBone()) {
-            let mesh = scene.meshes[node.meshIndices[0]];
-            let bone = mesh.bones[node.boneIndex];
-            boneTransforms[node.meshIndices[0]][node.boneIndex] = mat4Multiply(nodeTransforms[nodeIndex], bone.offsetMat);
-        }
-    });
-
     scene.nodes.forEach(node => {
-        if (node.hasMeshes()) {
-            setUniforms(shaderProgram, {
-                'uModelMat': mat4Identity(),
-            });
+        if (node.hasMeshes() && !node.hasBone()) {
             node.meshIndices.forEach(meshIndex =>
-                drawMesh(scene.meshes[meshIndex], shaderProgram, boneTransforms[meshIndex]));
+                drawMesh(scene.meshes[meshIndex], shaderProgram, state.boneTransforms[meshIndex]));
         }
     });
+}
+
+class DebugBoneBuffer {
+    positionBuffer; // WebGLBuffer
+    colorBuffer; // WebGLBuffer
+    indexBuffer; // WebGLBuffer
+    positions = []; // number[]
+    colors = []; // number[]
+    indices = []; // number[]
+
+    constructor() {
+        this.positionBuffer = gl.createBuffer();
+        this.colorBuffer = gl.createBuffer();
+        this.indexBuffer = gl.createBuffer();
+    }
+
+    pushVertex(pos, color) {
+        this.positions.push(...pos);
+        this.colors.push(...color);
+        this.indices.push(this.indices.length);
+    }
+
+    update(scene, state) {
+        [this.positions, this.colors, this.indices] = [[], [], []];
+
+        let root = scene.nodes.find(node => node.name === 'torso' && node.hasBone());
+        let currNodeIndices = [...root.childIndices];
+
+        while (currNodeIndices.length > 0) {
+            let currNodes = currNodeIndices.map(nodeIndex => scene.nodes[nodeIndex]);
+            let parentTransforms = currNodes
+                .map(node => node.hasParent() ? state.nodeTransforms[node.parentIndex] : null);
+
+            currNodeIndices.forEach((nodeIndex, i) => {
+                if (scene.nodes[nodeIndex].name.includes('IK')) {
+                    return;
+                }
+                this.pushVertex(
+                    [parentTransforms[i][12], parentTransforms[i][13], parentTransforms[i][14]],
+                    [1, 1, 0]);
+                this.pushVertex(
+                    [state.nodeTransforms[nodeIndex][12], state.nodeTransforms[nodeIndex][13], state.nodeTransforms[nodeIndex][14]],
+                    [1, 1, 0]);
+            })
+
+            currNodeIndices = currNodes.map(node => node.childIndices).flat();
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.indices), gl.STATIC_DRAW);
+    }
+
+    draw(shaderProgram, modelMat, viewMat, projMat) {
+        gl.disable(gl.DEPTH_TEST);
+        gl.useProgram(shaderProgram.handle);
+        setUniforms(shaderProgram, {
+            'uModelMat': modelMat,
+            'uViewMat': viewMat,
+            'uProjMat': projMat,
+        });
+        setAttribute(shaderProgram, 'aPos', this.positionBuffer, 3, 0);
+        setAttribute(shaderProgram, 'aColor', this.colorBuffer, 3, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.drawElements(gl.LINES, this.indices.length, gl.UNSIGNED_INT, 0);
+    }
 }

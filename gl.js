@@ -102,5 +102,7 @@ function setAttribute(shaderProgram, attribName, buffer, numComponents, offset) 
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.enableVertexAttribArray(location);
         gl.vertexAttribPointer(location, numComponents, gl.FLOAT, false, 0, offset);
+    } else {
+        console.error(shaderProgram, "doesn't have attribute", attribName);
     }
 }
