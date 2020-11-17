@@ -368,8 +368,8 @@ class DebugBoneBuffer {
     update(scene, state) {
         [this.positions, this.colors, this.indices] = [[], [], []];
 
-        let root = scene.nodes.find(node => node.name === 'torso' && node.hasBone());
-        let currNodeIndices = [...root.childIndices];
+        let roots = scene.nodes.filter(node => (node.name === 'torso' || (node.hasParent() && scene.nodes[node.parentIndex].name === 'root')));
+        let currNodeIndices = roots.map(node => [...node.childIndices]).flat();
 
         while (currNodeIndices.length > 0) {
             let currNodes = currNodeIndices.map(nodeIndex => scene.nodes[nodeIndex]);
@@ -380,6 +380,7 @@ class DebugBoneBuffer {
                 if (scene.nodes[nodeIndex].name.includes('IK')) {
                     return;
                 }
+
                 this.pushVertex(
                     [parentTransforms[i][12], parentTransforms[i][13], parentTransforms[i][14]],
                     [1, 1, 0]);

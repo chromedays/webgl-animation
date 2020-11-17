@@ -15,6 +15,7 @@ async function main() {
 
     let debugBoneBuffer = new DebugBoneBuffer();
 
+    sceneState.animIndex = 2;
     let animSelector = document.querySelector("#animation_selector");
     {
         let div = document.createElement('div');
@@ -56,6 +57,7 @@ async function main() {
         div.appendChild(label);
         animSelector.appendChild(div);
     })
+
 
     let drawModelButton = document.querySelector("#draw_model");
     let drawBonesButton = document.querySelector("#draw_bones");
