@@ -96,11 +96,11 @@ function setUniforms(shaderProgram, uniforms) {
     }
 };
 
-function setAttribute(shaderProgram, attribName, buffer, numComponents) {
+function setAttribute(shaderProgram, attribName, buffer, numComponents, offset) {
     let location = gl.getAttribLocation(shaderProgram.handle, attribName);
     if (location >= 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
         gl.enableVertexAttribArray(location);
-        gl.vertexAttribPointer(location, numComponents, gl.FLOAT, false, 0, 0);
+        gl.vertexAttribPointer(location, numComponents, gl.FLOAT, false, 0, offset);
     }
 }

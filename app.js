@@ -111,7 +111,8 @@ async function main() {
         indices: [],
     };
 
-    let currAnim = model.animations[2];
+    let currAnimIndex = 2;
+    let currAnim = model.animations[currAnimIndex];
     let channelMap = new Map();
     for (let i = 0; i < currAnim.channels.length; ++i) {
         channelMap.set(currAnim.channels[i].name, currAnim.channels[i]);
@@ -268,6 +269,7 @@ async function main() {
         label.setAttribute('for', button.id);
         label.innerHTML = anim.name;
         button.addEventListener('click', () => {
+            currAnimIndex = i;
             currAnim = anim;
             currentTick = 0;
         });
@@ -411,7 +413,7 @@ async function main() {
             }
         }
 
-        drawScene(scene, shaderProgram, viewMat, projMat);
+        drawScene(scene, shaderProgram, viewMat, projMat, currAnimIndex, currentTick);
 
         window.requestAnimationFrame(draw);
     };

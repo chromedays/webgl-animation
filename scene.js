@@ -3,6 +3,7 @@ class Scene {
 
     nodes = []; // Node[]
     meshes = []; // Mesh[]
+    animations = [] // Animation[]
 }
 
 class Node {
@@ -88,7 +89,8 @@ class NodeAnim {
 class Animation {
     name; // string
     duration; // number
-    ticksPerSecond; // number   
+    ticksPerSecond; // number
+    channels = []; // NodeAnim[]
 }
 
 function parseScene(s) {
@@ -212,6 +214,37 @@ function parseScene(s) {
 
     scene.rootNode = scene.nodes[0];
 
+    scene.animations = s.animations.map(a => {
+        let anim = new Animation();
+        anim.name = a.name;
+        anim.duration = a.duration;
+        anim.ticksPerSecond = a.tickspersecond;
+        anim.channels = new Map(a.channels.map(ch => {
+            let channel = new NodeAnim();
+            channel.name = ch.name;
+            channel.positionKeys = ch.positionkeys.map(p => {
+                let key = new Vec3Key();
+                key.tick = p[0];
+                key.value = [...p[1]];
+                return key;
+            });
+            channel.rotationKeys = ch.rotationkeys.map(r => {
+                let key = new QuatKey();
+                key.tick = r[0];
+                key.value = quat(r[1][0], r[1].slice(1));
+                return key;
+            });
+            channel.scalingKeys = ch.scalingkeys.map(s => {
+                let key = new Vec3Key();
+                key.tick = s[0];
+                key.value = [...s[1]];
+                return key;
+            })
+            return [channel.name, channel];
+        }));
+        return anim;
+    });
+
     return scene;
 }
 
@@ -227,7 +260,30 @@ function drawMesh(mesh, shaderProgram, boneTransforms) {
     gl.drawElements(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_INT, 0);
 }
 
-function drawScene(scene, shaderProgram, viewMat, projMat) {
+function interpolateKeyframes(keyframes, tick, lerpFunc) {
+    let value = keyframes[0].value;
+
+    if (keyframes.length > 1) {
+        let currentKeyIndex = 0;
+        for (let i = 0; i < keyframes.length - 1; ++i) {
+            if (tick < keyframes[i + 1].tick) {
+                currentKeyIndex = i;
+                break;
+            }
+        }
+        let currentKey = keyframes[currentKeyIndex];
+        let nextKey = keyframes[currentKeyIndex + 1];
+
+        let t = (tick - currentKey.tick) / (nextKey.tick - currentKey.tick);
+        console.assert(t >= 0 && t <= 1, `Invalid t value ${t}`);
+
+        value = lerpFunc(currentKey.value, nextKey.value, t);
+    }
+
+    return value;
+}
+
+function drawScene(scene, shaderProgram, viewMat, projMat, animIndex, tick) {
     gl.useProgram(shaderProgram.handle);
     gl.enable(gl.DEPTH_TEST);
     setUniforms(shaderProgram, {
@@ -244,9 +300,21 @@ function drawScene(scene, shaderProgram, viewMat, projMat) {
         }
     });
 
+    let anim = scene.animations[animIndex];
+
     scene.nodes.forEach((node, nodeIndex) => {
         if (node.hasParent()) {
-            nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], node.transform);
+            if (anim.channels.has(node.name)) {
+                let channel = anim.channels.get(node.name);
+                let v = interpolateKeyframes(channel.positionKeys, tick, vec3Lerp);
+                let q = interpolateKeyframes(channel.rotationKeys, tick, quatSlerp);
+                let s = interpolateKeyframes(channel.scalingKeys, tick, vec3Lerp);
+                // console.log(v, q, s);
+                let localTransform = mat4Multiply(mat4Translate(v), mat4Multiply(quatToMat4(q), mat4Scale(s)));
+                nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], localTransform);
+            } else {
+                nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], node.transform);
+            }
         } else {
             nodeTransforms[nodeIndex] = node.transform;
         }
