@@ -15,17 +15,6 @@ async function main() {
 
     let debugBoneBuffer = new DebugBoneBuffer();
 
-    let boneBuffer = {
-        vb: {
-            pos: gl.createBuffer(),
-            color: gl.createBuffer(),
-        },
-        ib: gl.createBuffer(),
-        positions: [],
-        colors: [],
-        indices: [],
-    };
-
     let animSelector = document.querySelector("#animation_selector");
     {
         let div = document.createElement('div');
@@ -154,60 +143,8 @@ async function main() {
         camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
-        let modelMat = mat4Identity();
         let viewMat = mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
         let projMat = mat4Perspective();
-
-        // for (let i = 0; i < meshes.length; ++i) {
-        //     gl.useProgram(shaderProgram.handle);
-
-        //     let vb = meshes[i].vb;
-        //     let ib = meshes[i].ib;
-
-        //     let boneMatrices = [];
-        //     if (boneTransformsTable.has(i)) {
-        //         for (let j = 0; j < boneTransformsTable.get(i).length; ++j) {
-        //             boneMatrices.push(...boneTransformsTable.get(i)[j]);
-        //         }
-        //     } else {
-        //         boneMatrices.push(...mat4Identity());
-        //     }
-
-        //     gl.enable(gl.DEPTH_TEST);
-
-        //     setUniforms(shaderProgram, {
-        //         'uBones[0]': boneMatrices,
-        //         'uModelMat': modelMat,
-        //         'uViewMat': viewMat,
-        //         'uProjMat': projMat,
-        //     });
-
-        //     setAttribute(shaderProgram, 'aPos', vb.pos, 3, 0);
-        //     setAttribute(shaderProgram, 'aNormal', vb.normal, 3, 0);
-        //     setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4, 0);
-        //     setAttribute(shaderProgram, 'aBoneWeights', vb.boneWeights, 4, 0);
-        //     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-        //     if (drawModelButton.checked) {
-        //         // gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
-        //     }
-
-        //     buildBoneVertices();
-        //     if (boneBuffer.positions.length > 0) {
-        //         gl.disable(gl.DEPTH_TEST);
-        //         gl.useProgram(debugBonesShaderProgram.handle);
-        //         setUniforms(debugBonesShaderProgram, {
-        //             'uModelMat': modelMat,
-        //             'uViewMat': viewMat,
-        //             'uProjMat': projMat,
-        //         });
-        //         setAttribute(debugBonesShaderProgram, 'aPos', boneBuffer.vb.pos, 3, 0);
-        //         setAttribute(debugBonesShaderProgram, 'aColor', boneBuffer.vb.color, 3, 0);
-        //         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boneBuffer.ib);
-        //         if (drawBonesButton.checked) {
-        //             // gl.drawElements(gl.LINES, boneBuffer.indices.length, gl.UNSIGNED_INT, 0);
-        //         }
-        //     }
-        // }
 
         if (drawModelButton.checked) {
             drawScene(scene, shaderProgram, viewMat, projMat, sceneState);
