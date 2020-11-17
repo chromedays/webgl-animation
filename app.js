@@ -1,5 +1,5 @@
-
-
+var spector = new SPECTOR.Spector();
+spector.displayUI();
 async function main() {
     let model = await loadModel();
     console.log(model);
@@ -178,7 +178,7 @@ async function main() {
                 let currentKey = channel.scalingkeys[currentKeyIndex];
                 let nextKey = channel.scalingkeys[nextKeyIndex];
                 let t = (currentTick - currentKey[0]) / (nextKey[0] - currentKey[0]);
-                console.assert(t >= 0 && t <= 1, 'what?');
+                console.assert(t >= 0 && t <= 1, `Invalid t value ${t}`);
                 s = vec3Lerp(currentKey[1], nextKey[1], t);
             }
 
@@ -350,13 +350,14 @@ async function main() {
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.viewport(0, 0, canvas.width, canvas.height);
 
+        let camHeight = 100;
         let camPos = [0, 0, 0];
         camPos[0] = Math.sin(camTheta * Math.PI / 180) * Math.cos(camPhi * Math.PI / 180) * camDistance;
-        camPos[1] = 100 + Math.cos(camTheta * Math.PI / 180) * camDistance;
+        camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
         let modelMat = mat4Identity();
-        let viewMat = mat4LookAt(camPos, [0, 100, 0], [0, 1, 0]);
+        let viewMat = mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
         let projMat = mat4Perspective();
 
         for (let i = 0; i < meshes.length; ++i) {
@@ -383,13 +384,13 @@ async function main() {
                 'uProjMat': projMat,
             });
 
-            setAttribute(shaderProgram, 'aPos', vb.pos, 3);
-            setAttribute(shaderProgram, 'aNormal', vb.normal, 3);
-            setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4);
-            setAttribute(shaderProgram, 'aBoneWeights', vb.boneWeights, 4);
+            setAttribute(shaderProgram, 'aPos', vb.pos, 3, 0);
+            setAttribute(shaderProgram, 'aNormal', vb.normal, 3, 0);
+            setAttribute(shaderProgram, 'aBoneIndices', vb.boneIndices, 4, 0);
+            setAttribute(shaderProgram, 'aBoneWeights', vb.boneWeights, 4, 0);
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
             if (drawModelButton.checked) {
-                gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
+                // gl.drawElements(gl.TRIANGLES, meshes[i].indices.length, gl.UNSIGNED_INT, 0);
             }
 
             buildBoneVertices();
@@ -401,14 +402,16 @@ async function main() {
                     'uViewMat': viewMat,
                     'uProjMat': projMat,
                 });
-                setAttribute(debugBonesShaderProgram, 'aPos', boneBuffer.vb.pos, 3);
-                setAttribute(debugBonesShaderProgram, 'aColor', boneBuffer.vb.color, 3);
+                setAttribute(debugBonesShaderProgram, 'aPos', boneBuffer.vb.pos, 3, 0);
+                setAttribute(debugBonesShaderProgram, 'aColor', boneBuffer.vb.color, 3, 0);
                 gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boneBuffer.ib);
                 if (drawBonesButton.checked) {
-                    gl.drawElements(gl.LINES, boneBuffer.indices.length, gl.UNSIGNED_INT, 0);
+                    // gl.drawElements(gl.LINES, boneBuffer.indices.length, gl.UNSIGNED_INT, 0);
                 }
             }
         }
+
+        drawScene(scene, shaderProgram, viewMat, projMat);
 
         window.requestAnimationFrame(draw);
     };

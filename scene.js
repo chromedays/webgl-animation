@@ -16,13 +16,16 @@ class Node {
 
     transform = mat4Identity(); // number[]
 
-    get mesh() {
-        return this.scene.meshes[this.meshIndex];
+    hasMeshes() {
+        return this.meshIndices.length > 0;
     }
 
-    get bone() {
-        // TODO: return dummy if boneIndex < 0
-        return this.scene.meshes[this.meshIndex].bones[this.boneIndex];
+    hasBone() {
+        return this.boneIndex >= 0;
+    }
+
+    hasParent() {
+        return this.parentIndex >= 0;
     }
 }
 
@@ -63,6 +66,29 @@ class Bone {
     meshIndex; // number
     offsetMat; // number[]
     weights; // VertexWeight[]
+}
+
+class Vec3Key {
+    tick; // number
+    value; // number[3]
+}
+
+class QuatKey {
+    tick; // number
+    value; // number[4]
+}
+
+class NodeAnim {
+    name; // string
+    positionKeys; // Vec3Key[]
+    scalingKeys; // Vec3Key[]
+    rotationKeys; // QuatKey[]
+}
+
+class Animation {
+    name; // string
+    duration; // number
+    ticksPerSecond; // number   
 }
 
 function parseScene(s) {
@@ -148,13 +174,16 @@ function parseScene(s) {
                 node.meshIndices = [...n.meshes]
             }
             node.parentIndex = parents[i];
-            if (node.parentIndex >= 0) {
+            if (node.hasParent()) {
                 let parent = scene.nodes[node.parentIndex];
                 parent.childIndices.push(scene.nodes.length + i);
                 // console.log(parent.name, '->', node.name);
             } else {
                 // console.log('->', node.name);
             }
+
+            node.transform = mat4Transpose(n.transformation);
+
             return node;
         });
 
@@ -181,5 +210,61 @@ function parseScene(s) {
         // console.log('Parents:', parents);
     }
 
+    scene.rootNode = scene.nodes[0];
+
     return scene;
+}
+
+function drawMesh(mesh, shaderProgram, boneTransforms) {
+    setUniforms(shaderProgram, {
+        'uBones[0]': boneTransforms.flat(),
+    });
+    setAttribute(shaderProgram, 'aPos', mesh.gpu.positionBuffer, 3, 0);
+    setAttribute(shaderProgram, 'aNormal', mesh.gpu.normalBuffer, 3, 0);
+    setAttribute(shaderProgram, 'aBoneIndices', mesh.gpu.boneIndexBuffer, 4, 0);
+    setAttribute(shaderProgram, 'aBoneWeights', mesh.gpu.boneWeightBuffer, 4, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
+    gl.drawElements(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_INT, 0);
+}
+
+function drawScene(scene, shaderProgram, viewMat, projMat) {
+    gl.useProgram(shaderProgram.handle);
+    gl.enable(gl.DEPTH_TEST);
+    setUniforms(shaderProgram, {
+        'uViewMat': viewMat,
+        'uProjMat': projMat,
+    });
+
+    let nodeTransforms = scene.nodes.map(_ => mat4Identity());
+    let boneTransforms = scene.meshes.map(mesh => {
+        if (mesh.bones.length > 0) {
+            return mesh.bones.map(_ => mat4Identity());
+        } else {
+            return [mat4Identity()];
+        }
+    });
+
+    scene.nodes.forEach((node, nodeIndex) => {
+        if (node.hasParent()) {
+            nodeTransforms[nodeIndex] = mat4Multiply(nodeTransforms[node.parentIndex], node.transform);
+        } else {
+            nodeTransforms[nodeIndex] = node.transform;
+        }
+
+        if (node.hasBone()) {
+            let mesh = scene.meshes[node.meshIndices[0]];
+            let bone = mesh.bones[node.boneIndex];
+            boneTransforms[node.meshIndices[0]][node.boneIndex] = mat4Multiply(nodeTransforms[nodeIndex], bone.offsetMat);
+        }
+    });
+
+    scene.nodes.forEach(node => {
+        if (node.hasMeshes()) {
+            setUniforms(shaderProgram, {
+                'uModelMat': mat4Identity(),
+            });
+            node.meshIndices.forEach(meshIndex =>
+                drawMesh(scene.meshes[meshIndex], shaderProgram, boneTransforms[meshIndex]));
+        }
+    });
 }
