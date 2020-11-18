@@ -1,19 +1,21 @@
-
+import * as R from './renderer.js'
+import * as S from './scene.js'
+import * as M from './math.js'
 
 async function main() {
     let scene;
     {
         let model = await loadModel();
         console.log(model);
-        scene = parseScene(model);
+        scene = S.parseScene(model);
         console.log(scene);
     }
-    let sceneState = new SceneState();
+    let sceneState = new S.SceneState();
 
-    let shaderProgram = await createShaderProgramFromFiles('shaders/default.vert', 'shaders/default.frag');
-    let debugBonesShaderProgram = await createShaderProgramFromFiles('shaders/debug_bones.vert', 'shaders/debug_bones.frag');
+    let shaderProgram = await R.createShaderProgramFromFiles('shaders/default.vert', 'shaders/default.frag');
+    let debugBonesShaderProgram = await R.createShaderProgramFromFiles('shaders/debug_bones.vert', 'shaders/debug_bones.frag');
 
-    let debugBoneBuffer = new DebugBoneBuffer();
+    let debugBoneBuffer = new S.DebugBoneBuffer();
 
     sceneState.animIndex = 2;
     let animSelector = document.querySelector("#animation_selector");
@@ -68,7 +70,7 @@ async function main() {
 
     let camDistance = 300;
 
-    canvas.addEventListener('wheel', (e) => {
+    R.canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
         camDistance += e.deltaY / 10;
     })
@@ -87,14 +89,14 @@ async function main() {
 
     let mousePressed = false;
 
-    canvas.addEventListener('mousedown', () => {
+    R.canvas.addEventListener('mousedown', () => {
         mousePressed = true;
     });
 
     let camTheta = 90;
     let camPhi = 0;
 
-    canvas.addEventListener('mousemove', (e) => {
+    R.canvas.addEventListener('mousemove', (e) => {
         if (mousePressed) {
             camPhi += e.movementX;
             camTheta -= e.movementY;
@@ -106,7 +108,7 @@ async function main() {
         }
     });
 
-    canvas.addEventListener('mouseup', () => {
+    R.canvas.addEventListener('mouseup', () => {
         mousePressed = false;
     });
 
@@ -131,13 +133,13 @@ async function main() {
         sceneState.updateTransforms(scene);
         debugBoneBuffer.update(scene, sceneState);
 
-        gl.clearColor(0.2, 0.2, 0.3, 1);
-        gl.enable(gl.DEPTH_TEST);
-        gl.disable(gl.CULL_FACE);
-        gl.cullFace(gl.BACK);
-        gl.frontFace(gl.CCW);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.viewport(0, 0, canvas.width, canvas.height);
+        R.gl.clearColor(0.2, 0.2, 0.3, 1);
+        R.gl.enable(R.gl.DEPTH_TEST);
+        R.gl.disable(R.gl.CULL_FACE);
+        R.gl.cullFace(R.gl.BACK);
+        R.gl.frontFace(R.gl.CCW);
+        R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
+        R.gl.viewport(0, 0, R.canvas.width, R.canvas.height);
 
         let camHeight = 100;
         let camPos = [0, 0, 0];
@@ -145,14 +147,14 @@ async function main() {
         camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
-        let viewMat = mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
-        let projMat = mat4Perspective();
+        let viewMat = M.mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
+        let projMat = M.mat4Perspective();
 
         if (drawModelButton.checked) {
-            drawScene(scene, shaderProgram, viewMat, projMat, sceneState);
+            S.drawScene(scene, shaderProgram, viewMat, projMat, sceneState);
         }
         if (sceneState.drawBones) {
-            debugBoneBuffer.draw(debugBonesShaderProgram, mat4Identity(), viewMat, projMat);
+            debugBoneBuffer.draw(debugBonesShaderProgram, M.mat4Identity(), viewMat, projMat);
         }
 
         window.requestAnimationFrame(draw);
@@ -167,3 +169,5 @@ async function loadModel() {
     let model = JSON.parse(text);
     return model;
 }
+
+main();

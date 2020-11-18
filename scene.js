@@ -1,4 +1,7 @@
-class Scene {
+import * as R from './renderer.js'
+import * as M from './math.js'
+
+export class Scene {
     rootNode = null; // Node
 
     nodes = []; // Node[]
@@ -6,7 +9,7 @@ class Scene {
     animations = [] // Animation[]
 }
 
-class Node {
+export class Node {
     scene; // Scene
 
     name; // string
@@ -15,7 +18,7 @@ class Node {
     parentIndex = -1; // number
     childIndices = []; // number[]
 
-    transform = mat4Identity(); // number[]
+    transform = M.mat4Identity(); // number[]
 
     hasMeshes() {
         return this.meshIndices.length > 0;
@@ -30,7 +33,7 @@ class Node {
     }
 }
 
-class MeshGPU {
+export class MeshGPU {
     positionBuffer; // WebGLBuffer
     normalBuffer; // WebGLBuffer
     boneIndexBuffer; // WebGLBuffer
@@ -38,7 +41,7 @@ class MeshGPU {
     indexBuffer; // WebGLBuffer
 }
 
-class Mesh {
+export class Mesh {
     name; // string
     positions = []; // number[]
     normals = []; // number[]
@@ -52,7 +55,7 @@ class Mesh {
     gpu; // MeshGPU
 }
 
-class VertexWeight {
+export class VertexWeight {
     vertexIndex; // number
     weight; // number
 
@@ -62,38 +65,39 @@ class VertexWeight {
     }
 }
 
-class Bone {
+export class Bone {
     name; // string
     meshIndex; // number
     offsetMat; // number[]
     weights; // VertexWeight[]
 }
 
-class Vec3Key {
+export class Vec3Key {
     tick; // number
     value; // number[3]
 }
 
-class QuatKey {
+export class QuatKey {
     tick; // number
     value; // number[4]
 }
 
-class NodeAnim {
+export class NodeAnim {
     name; // string
     positionKeys; // Vec3Key[]
     scalingKeys; // Vec3Key[]
     rotationKeys; // QuatKey[]
 }
 
-class Animation {
+export class Animation {
     name; // string
     duration; // number
     ticksPerSecond; // number
     channels = []; // NodeAnim[]
 }
 
-function parseScene(s) {
+export function parseScene(s) {
+
     let scene = new Scene();
     let meshBoneIndexTable = new Map();
 
@@ -115,7 +119,7 @@ function parseScene(s) {
                 let bone = new Bone();
                 bone.name = b.name;
                 bone.meshIndex = i;
-                bone.offsetMat = mat4Transpose(b.offsetmatrix);
+                bone.offsetMat = M.mat4Transpose(b.offsetmatrix);
                 bone.weights = b.weights.map(w => new VertexWeight(w[0], w[1]));
                 meshBoneIndexTable.set(bone.name, {
                     meshIndex: i,
@@ -134,29 +138,29 @@ function parseScene(s) {
         }
 
         mesh.gpu = new MeshGPU();
-        mesh.gpu.positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.gpu.positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.positions), gl.STATIC_DRAW);
+        mesh.gpu.positionBuffer = R.gl.createBuffer();
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.positionBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.positions), R.gl.STATIC_DRAW);
 
-        mesh.gpu.normalBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.gpu.normalBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.normals), gl.STATIC_DRAW);
+        mesh.gpu.normalBuffer = R.gl.createBuffer();
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.normalBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.normals), R.gl.STATIC_DRAW);
 
-        mesh.gpu.boneIndexBuffer = gl.createBuffer()
+        mesh.gpu.boneIndexBuffer = R.gl.createBuffer()
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.gpu.boneIndexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.boneIndexBufferData), gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.boneIndexBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.boneIndexBufferData), R.gl.STATIC_DRAW);
 
-        mesh.gpu.boneWeightBuffer = gl.createBuffer()
-        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.gpu.boneWeightBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mesh.boneWeightBufferData), gl.STATIC_DRAW);
+        mesh.gpu.boneWeightBuffer = R.gl.createBuffer()
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.boneWeightBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.boneWeightBufferData), R.gl.STATIC_DRAW);
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
 
-        mesh.gpu.indexBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
+        mesh.gpu.indexBuffer = R.gl.createBuffer();
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
+        R.gl.bufferData(R.gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), R.gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, null);
 
         return mesh;
     });
@@ -184,7 +188,7 @@ function parseScene(s) {
                 // console.log('->', node.name);
             }
 
-            node.transform = mat4Transpose(n.transformation);
+            node.transform = M.mat4Transpose(n.transformation);
 
             return node;
         });
@@ -231,7 +235,7 @@ function parseScene(s) {
             channel.rotationKeys = ch.rotationkeys.map(r => {
                 let key = new QuatKey();
                 key.tick = r[0];
-                key.value = quat(r[1][0], r[1].slice(1));
+                key.value = M.quat(r[1][0], r[1].slice(1));
                 return key;
             });
             channel.scalingKeys = ch.scalingkeys.map(s => {
@@ -248,19 +252,19 @@ function parseScene(s) {
     return scene;
 }
 
-function drawMesh(mesh, shaderProgram, boneTransforms) {
-    setUniforms(shaderProgram, {
+export function drawMesh(mesh, shaderProgram, boneTransforms) {
+    R.setUniforms(shaderProgram, {
         'uBones[0]': boneTransforms.flat(),
     });
-    setAttribute(shaderProgram, 'aPos', mesh.gpu.positionBuffer, 3, 0);
-    setAttribute(shaderProgram, 'aNormal', mesh.gpu.normalBuffer, 3, 0);
-    setAttribute(shaderProgram, 'aBoneIndices', mesh.gpu.boneIndexBuffer, 4, 0);
-    setAttribute(shaderProgram, 'aBoneWeights', mesh.gpu.boneWeightBuffer, 4, 0);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
-    gl.drawElements(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_INT, 0);
+    R.setAttribute(shaderProgram, 'aPos', mesh.gpu.positionBuffer, 3, 0);
+    R.setAttribute(shaderProgram, 'aNormal', mesh.gpu.normalBuffer, 3, 0);
+    R.setAttribute(shaderProgram, 'aBoneIndices', mesh.gpu.boneIndexBuffer, 4, 0);
+    R.setAttribute(shaderProgram, 'aBoneWeights', mesh.gpu.boneWeightBuffer, 4, 0);
+    R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
+    R.gl.drawElements(R.gl.TRIANGLES, mesh.indices.length, R.gl.UNSIGNED_INT, 0);
 }
 
-function interpolateKeyframes(keyframes, tick, lerpFunc) {
+export function interpolateKeyframes(keyframes, tick, lerpFunc) {
     let value = keyframes[0].value;
 
     if (keyframes.length > 1) {
@@ -283,7 +287,7 @@ function interpolateKeyframes(keyframes, tick, lerpFunc) {
     return value;
 }
 
-class SceneState {
+export class SceneState {
     animIndex = -1;
     tick = 0;
     drawBones = false;
@@ -291,12 +295,12 @@ class SceneState {
     boneTransforms = [];
 
     updateTransforms(scene) {
-        this.nodeTransforms = scene.nodes.map(_ => mat4Identity());
+        this.nodeTransforms = scene.nodes.map(_ => M.mat4Identity());
         this.boneTransforms = scene.meshes.map(mesh => {
             if (mesh.bones.length > 0) {
-                return mesh.bones.map(_ => mat4Identity());
+                return mesh.bones.map(_ => M.mat4Identity());
             } else {
-                return [mat4Identity()];
+                return [M.mat4Identity()];
             }
         });
 
@@ -306,13 +310,13 @@ class SceneState {
             if (node.hasParent()) {
                 if (anim && anim.channels.has(node.name)) {
                     let channel = anim.channels.get(node.name);
-                    let v = interpolateKeyframes(channel.positionKeys, this.tick, vec3Lerp);
-                    let q = interpolateKeyframes(channel.rotationKeys, this.tick, quatSlerp);
-                    let s = interpolateKeyframes(channel.scalingKeys, this.tick, vec3Lerp);
-                    let localTransform = mat4Multiply(mat4Translate(v), mat4Multiply(quatToMat4(q), mat4Scale(s)));
-                    this.nodeTransforms[nodeIndex] = mat4Multiply(this.nodeTransforms[node.parentIndex], localTransform);
+                    let v = interpolateKeyframes(channel.positionKeys, this.tick, M.vec3Lerp);
+                    let q = interpolateKeyframes(channel.rotationKeys, this.tick, M.quatSlerp);
+                    let s = interpolateKeyframes(channel.scalingKeys, this.tick, M.vec3Lerp);
+                    let localTransform = M.mat4Multiply(M.mat4Translate(v), M.mat4Multiply(M.quatToMat4(q), M.mat4Scale(s)));
+                    this.nodeTransforms[nodeIndex] = M.mat4Multiply(this.nodeTransforms[node.parentIndex], localTransform);
                 } else {
-                    this.nodeTransforms[nodeIndex] = mat4Multiply(this.nodeTransforms[node.parentIndex], node.transform);
+                    this.nodeTransforms[nodeIndex] = M.mat4Multiply(this.nodeTransforms[node.parentIndex], node.transform);
                 }
             } else {
                 this.nodeTransforms[nodeIndex] = node.transform;
@@ -322,17 +326,17 @@ class SceneState {
                 let mesh = scene.meshes[node.meshIndices[0]];
                 let bone = mesh.bones[node.boneIndex];
                 this.boneTransforms[node.meshIndices[0]][node.boneIndex] =
-                    mat4Multiply(this.nodeTransforms[nodeIndex], bone.offsetMat);
+                    M.mat4Multiply(this.nodeTransforms[nodeIndex], bone.offsetMat);
             }
         });
     }
 };
 
-function drawScene(scene, shaderProgram, viewMat, projMat, state) {
-    gl.useProgram(shaderProgram.handle);
-    gl.enable(gl.DEPTH_TEST);
-    setUniforms(shaderProgram, {
-        'uModelMat': mat4Identity(),
+export function drawScene(scene, shaderProgram, viewMat, projMat, state) {
+    R.gl.useProgram(shaderProgram.handle);
+    R.gl.enable(R.gl.DEPTH_TEST);
+    R.setUniforms(shaderProgram, {
+        'uModelMat': M.mat4Identity(),
         'uViewMat': viewMat,
         'uProjMat': projMat,
     });
@@ -345,7 +349,7 @@ function drawScene(scene, shaderProgram, viewMat, projMat, state) {
     });
 }
 
-class DebugBoneBuffer {
+export class DebugBoneBuffer {
     positionBuffer; // WebGLBuffer
     colorBuffer; // WebGLBuffer
     indexBuffer; // WebGLBuffer
@@ -354,9 +358,9 @@ class DebugBoneBuffer {
     indices = []; // number[]
 
     constructor() {
-        this.positionBuffer = gl.createBuffer();
-        this.colorBuffer = gl.createBuffer();
-        this.indexBuffer = gl.createBuffer();
+        this.positionBuffer = R.gl.createBuffer();
+        this.colorBuffer = R.gl.createBuffer();
+        this.indexBuffer = R.gl.createBuffer();
     }
 
     pushVertex(pos, color) {
@@ -392,25 +396,25 @@ class DebugBoneBuffer {
             currNodeIndices = currNodes.map(node => node.childIndices).flat();
         }
 
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.colors), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.indices), gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.positionBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(this.positions), R.gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.colorBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(this.colors), R.gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        R.gl.bufferData(R.gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.indices), R.gl.STATIC_DRAW);
     }
 
     draw(shaderProgram, modelMat, viewMat, projMat) {
-        gl.disable(gl.DEPTH_TEST);
-        gl.useProgram(shaderProgram.handle);
-        setUniforms(shaderProgram, {
+        R.gl.disable(R.gl.DEPTH_TEST);
+        R.gl.useProgram(shaderProgram.handle);
+        R.setUniforms(shaderProgram, {
             'uModelMat': modelMat,
             'uViewMat': viewMat,
             'uProjMat': projMat,
         });
-        setAttribute(shaderProgram, 'aPos', this.positionBuffer, 3, 0);
-        setAttribute(shaderProgram, 'aColor', this.colorBuffer, 3, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
-        gl.drawElements(gl.LINES, this.indices.length, gl.UNSIGNED_INT, 0);
+        R.setAttribute(shaderProgram, 'aPos', this.positionBuffer, 3, 0);
+        R.setAttribute(shaderProgram, 'aColor', this.colorBuffer, 3, 0);
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        R.gl.drawElements(R.gl.LINES, this.indices.length, R.gl.UNSIGNED_INT, 0);
     }
 }

@@ -1,8 +1,12 @@
-let canvas = document.querySelector('canvas')
-let gl = canvas.getContext('webgl');
+export let canvas = document.querySelector('canvas');
+export let gl = canvas.getContext('webgl');
 gl.getExtension('OES_element_index_uint');
 
-class UniformInfo {
+export function getGLContext() {
+    return gl;
+}
+
+export class UniformInfo {
     location; // WebGLUniformLocation
     type; // number
     size; // number
@@ -14,7 +18,7 @@ class UniformInfo {
     }
 };
 
-class ShaderProgram {
+export class ShaderProgram {
     handle; // number
     uniformTable; // Map<string, UniformInfo>
 
@@ -35,7 +39,7 @@ class ShaderProgram {
     }
 }
 
-async function createShaderProgramFromFiles(vert, frag) {
+export async function createShaderProgramFromFiles(vert, frag) {
     let vertSrc = await (await fetch(vert)).text();
     let fragSrc = await (await fetch(frag)).text();
     console.log('Compiling shaders:', vert, frag,);
@@ -46,7 +50,7 @@ async function createShaderProgramFromFiles(vert, frag) {
     return program;
 }
 
-function createShaderProgram(params) {
+export function createShaderProgram(params) {
     let vertShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertShader, params.vert);
     gl.compileShader(vertShader);
@@ -82,8 +86,10 @@ function createShaderProgram(params) {
     return result;
 }
 
-function setUniforms(shaderProgram, uniforms) {
-    for (key in uniforms) {
+export function setUniforms(shaderProgram, uniforms) {
+    // let keys = Object.keys(uniforms);
+    // console.log(keys);
+    for (let key in uniforms) {
         if (shaderProgram.uniformTable.has(key)) {
             let value = uniforms[key];
             let info = shaderProgram.uniformTable.get(key);
@@ -96,7 +102,7 @@ function setUniforms(shaderProgram, uniforms) {
     }
 };
 
-function setAttribute(shaderProgram, attribName, buffer, numComponents, offset) {
+export function setAttribute(shaderProgram, attribName, buffer, numComponents, offset) {
     let location = gl.getAttribLocation(shaderProgram.handle, attribName);
     if (location >= 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
