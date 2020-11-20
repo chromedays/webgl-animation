@@ -5,6 +5,7 @@
         "outDir": "dist",
         "sourceMap": true,
         "allowJs": true,
-        "noEmitOnError": true
+        "noEmitOnError": true,
+        "strict": true
     }
 }

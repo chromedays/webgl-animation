@@ -1,17 +1,17 @@
-export let canvas = document.querySelector('canvas');
-export let gl = canvas.getContext('webgl');
+export let canvas = document.querySelector('canvas')!;
+export let gl = canvas.getContext('webgl')!;
 gl.getExtension('OES_element_index_uint');
 
-export function getGLContext() {
+export function getGLContext(): WebGLRenderingContext {
     return gl;
 }
 
 export class UniformInfo {
-    location; // WebGLUniformLocation
-    type; // number
-    size; // number
+    location: WebGLUniformLocation;
+    type: number
+    size: number
 
-    constructor(location, type, size) {
+    constructor(location: WebGLUniformLocation, type: number, size: number) {
         this.location = location;
         this.type = type;
         this.size = size;
@@ -19,19 +19,19 @@ export class UniformInfo {
 };
 
 export class ShaderProgram {
-    handle; // number
-    uniformTable; // Map<string, UniformInfo>
+    handle: WebGLProgram
+    uniformTable: Map<string, UniformInfo>
 
-    constructor(programHandle) {
+    constructor(programHandle: WebGLProgram) {
         this.handle = programHandle;
-        this.uniformTable = new Map();
+        this.uniformTable = new Map<string, UniformInfo>();
 
-        let numUniforms = gl.getProgramParameter(this.handle, gl.ACTIVE_UNIFORMS);
+        let numUniforms: number = gl.getProgramParameter(this.handle, gl.ACTIVE_UNIFORMS);
 
         for (let i = 0; i < numUniforms; ++i) {
-            let info = gl.getActiveUniform(this.handle, i);
+            let info = gl.getActiveUniform(this.handle, i)!;
             this.uniformTable.set(info.name, new UniformInfo(
-                gl.getUniformLocation(this.handle, info.name),
+                gl.getUniformLocation(this.handle, info.name)!,
                 info.type,
                 info.size,
             ));
@@ -39,7 +39,7 @@ export class ShaderProgram {
     }
 }
 
-export async function createShaderProgramFromFiles(vert, frag) {
+export async function createShaderProgramFromFiles(vert: string, frag: string): Promise<WebGLProgram> {
     let vertSrc = await (await fetch(vert)).text();
     let fragSrc = await (await fetch(frag)).text();
     console.log('Compiling shaders:', vert, frag,);
@@ -50,8 +50,8 @@ export async function createShaderProgramFromFiles(vert, frag) {
     return program;
 }
 
-export function createShaderProgram(params) {
-    let vertShader = gl.createShader(gl.VERTEX_SHADER);
+export function createShaderProgram(params: { vert: string; frag: string; }) {
+    let vertShader = gl.createShader(gl.VERTEX_SHADER)!;
     gl.shaderSource(vertShader, params.vert);
     gl.compileShader(vertShader);
     if (!gl.getShaderParameter(vertShader, gl.COMPILE_STATUS)) {
@@ -59,7 +59,7 @@ export function createShaderProgram(params) {
         console.log(gl.getShaderInfoLog(vertShader));
     }
 
-    let fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+    let fragShader = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(fragShader, params.frag);
     gl.compileShader(fragShader);
     if (!gl.getShaderParameter(fragShader, gl.COMPILE_STATUS)) {
@@ -67,7 +67,7 @@ export function createShaderProgram(params) {
         console.log(gl.getShaderInfoLog(fragShader));
     }
 
-    let shaderProgram = gl.createProgram();
+    let shaderProgram = gl.createProgram()!;
     gl.attachShader(shaderProgram, vertShader);
     gl.attachShader(shaderProgram, fragShader);
     gl.linkProgram(shaderProgram);
@@ -86,13 +86,11 @@ export function createShaderProgram(params) {
     return result;
 }
 
-export function setUniforms(shaderProgram, uniforms) {
-    // let keys = Object.keys(uniforms);
-    // console.log(keys);
+export function setUniforms(shaderProgram: ShaderProgram, uniforms: any) {
     for (let key in uniforms) {
         if (shaderProgram.uniformTable.has(key)) {
-            let value = uniforms[key];
-            let info = shaderProgram.uniformTable.get(key);
+            let value = uniforms[key]!;
+            let info = shaderProgram.uniformTable.get(key)!;
             if (info.type === gl.FLOAT_MAT4) {
                 gl.uniformMatrix4fv(info.location, false, value);
             }
@@ -102,7 +100,7 @@ export function setUniforms(shaderProgram, uniforms) {
     }
 };
 
-export function setAttribute(shaderProgram, attribName, buffer, numComponents, offset) {
+export function setAttribute(shaderProgram: ShaderProgram, attribName: string, buffer: number, numComponents: number, offset: number) {
     let location = gl.getAttribLocation(shaderProgram.handle, attribName);
     if (location >= 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

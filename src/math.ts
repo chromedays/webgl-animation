@@ -1,82 +1,83 @@
 import * as R from './renderer.js'
 
-export function vec3Negate(v) {
+type Vec3 = [number, number, number];
+type Vec4 = [number, number, number, number];
+type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+
+export function vec3Negate(v: Vec3): Vec3 {
     return [-v[0], -v[1], -v[2]];
 }
 
-export function vec3Add(a, b) {
+export function vec3Add(a: Vec3, b: Vec3): Vec3 {
     return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
-export function vec3Sub(a, b) {
+export function vec3Sub(a: Vec3, b: Vec3): Vec3 {
     return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 }
 
-export function vec3Mulf(v, s) {
+export function vec3Mulf(v: Vec3, s: number): Vec3 {
     return [v[0] * s, v[1] * s, v[2] * s];
 }
 
-export function vec3Divf(v, s) {
+export function vec3Divf(v: Vec3, s: number): Vec3 {
     return [v[0] / s, v[1] / s, v[2] / s];
 }
 
-export function vec3Dot(a, b) {
+export function vec3Dot(a: Vec3, b: Vec3): number {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
 
-export function vec3Cross(a, b) {
+export function vec3Cross(a: Vec3, b: Vec3): Vec3 {
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
-export function vec3Length(v) {
+export function vec3Length(v: Vec3): number {
     return Math.sqrt(vec3Dot(v, v));
 }
 
-export function vec3Normalize(v) {
+export function vec3Normalize(v: Vec3): Vec3 {
     return vec3Divf(v, vec3Length(v));
 }
 
-export function vec3RotateByQuat(v, q) {
-}
-
-export function vec4Negate(v) {
+export function vec4Negate(v: Vec4): Vec4 {
     return [-v[0], -v[1], -v[2], -v[3]];
 }
 
-export function vec4Add(a, b) {
+export function vec4Add(a: Vec4, b: Vec4): Vec4 {
     return [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]];
 }
 
-export function vec4Sub(a, b) {
+export function vec4Sub(a: Vec4, b: Vec4): Vec4 {
     return [a[0] - b[0], a[1] - b[1], a[2] - b[2], a[3] - b[3]];
 }
 
-export function vec4Mulf(v, s) {
+export function vec4Mulf(v: Vec4, s: number): Vec4 {
     return [v[0] * s, v[1] * s, v[2] * s, v[3] * s];
 }
 
-export function vec4Divf(v, s) {
+export function vec4Divf(v: Vec4, s: number): Vec4 {
     return [v[0] / s, v[1] / s, v[2] / s, v[3] / s];
 }
 
-export function vec4Dot(a, b) {
+export function vec4Dot(a: Vec4, b: Vec4): number {
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3];
 }
 
-export function vec4Normalize(v) {
+export function vec4Normalize(v: Vec4): Vec4 {
     return vec4Divf(v, Math.sqrt(vec4Dot(v, v)));
 }
 
-export function mat4Identity() {
+export function mat4Identity(): Mat4 {
     return [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1,
-    ];
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+];
 }
 
-export function mat4Multiply(a, b) {
+export function mat4Multiply(a: Mat4, b: Mat4): Mat4 {
     return [
         a[0] * b[0] + a[4] * b[1] + a[8] * b[2] + a[12] * b[3],
         a[1] * b[0] + a[5] * b[1] + a[9] * b[2] + a[13] * b[3],
@@ -97,7 +98,7 @@ export function mat4Multiply(a, b) {
     ];
 }
 
-export function mat4Transpose(m) {
+export function mat4Transpose(m: Mat4): Mat4 {
     return [
         m[0], m[4], m[8], m[12],
         m[1], m[5], m[9], m[13],
@@ -106,7 +107,7 @@ export function mat4Transpose(m) {
     ];
 }
 
-export function mat4Translate(pos) {
+export function mat4Translate(pos: Vec3): Mat4 {
     return [
         1, 0, 0, 0,
         0, 1, 0, 0,
@@ -115,7 +116,7 @@ export function mat4Translate(pos) {
     ];
 }
 
-export function mat4Scale(scale) {
+export function mat4Scale(scale: Vec3): Mat4 {
     return [
         scale[0], 0, 0, 0,
         0, scale[1], 0, 0,
@@ -124,7 +125,7 @@ export function mat4Scale(scale) {
     ];
 }
 
-export function mat4LookAt(eye, target, upAxis) {
+export function mat4LookAt(eye: Vec3, target: Vec3, upAxis: Vec3): Mat4 {
     let look = vec3Normalize(vec3Sub(eye, target));
     let right = vec3Normalize(vec3Cross(upAxis, look));
     let up = vec3Normalize(vec3Cross(look, right));
@@ -137,7 +138,7 @@ export function mat4LookAt(eye, target, upAxis) {
     ];
 }
 
-export function mat4Perspective() {
+export function mat4Perspective(): Mat4 {
     let fov = 60;
     let a = R.canvas.width / R.canvas.height;
     let near = 0.1;
@@ -151,23 +152,23 @@ export function mat4Perspective() {
     ];
 }
 
-export function quatGetScalarPart(q) {
+export function quatGetScalarPart(q: Vec4): number {
     return q[3];
 }
 
-export function quatGetImaginaryPart(q) {
-    return q.slice(0, 3);
+export function quatGetImaginaryPart(q: Vec4): Vec3 {
+    return [q[0], q[1], q[2]];
 }
 
-export function quat(s, v) {
+export function quat(s: number, v: Vec3): Vec4 {
     return [...v, s];
 }
 
-export function quatIdentity() {
+export function quatIdentity(): Vec4 {
     return quat(1, [0, 0, 0]);
 }
 
-export function quatMultiply(a, b) {
+export function quatMultiply(a: Vec4, b: Vec4): Vec4 {
     let s0 = quatGetScalarPart(a);
     let v0 = quatGetImaginaryPart(a);
     let s1 = quatGetScalarPart(b);
@@ -177,11 +178,11 @@ export function quatMultiply(a, b) {
     return quat(s, v);
 }
 
-export function quatConjugate(q) {
-    return quat(vec3Negate(quatGetImaginaryPart(q)), quatGetScalarPart(q));
+export function quatConjugate(q: Vec4): Vec4 {
+    return quat(quatGetScalarPart(q), vec3Negate(quatGetImaginaryPart(q)));
 }
 
-export function quatRotateAroundAxis(axis, angle) {
+export function quatRotateAroundAxis(axis: Vec3, angle: number): Vec4 {
     let halfAngle = angle * 0.5;
     return quat(Math.cos(halfAngle), vec3Mulf(vec3Normalize(axis), Math.sin(halfAngle)));
 }
@@ -193,7 +194,7 @@ export function quatRotateToVec3(from, to) {
 }
 */
 
-export function quatToMat4(q) {
+export function quatToMat4(q: Vec4): Mat4 {
     return [
         1 - 2 * (q[1] * q[1] + q[2] * q[2]), 2 * (q[0] * q[1] + q[3] * q[2]), 2 * (q[0] * q[2] - q[3] * q[1]), 0,
         2 * (q[0] * q[1] - q[3] * q[2]), 1 - 2 * (q[0] * q[0] + q[2] * q[2]), 2 * (q[1] * q[2] + q[3] * q[0]), 0,
@@ -202,11 +203,11 @@ export function quatToMat4(q) {
     ];
 }
 
-export function vec3Lerp(a, b, t) {
+export function vec3Lerp(a: Vec3, b: Vec3, t: number): Vec3 {
     return vec3Add(vec3Mulf(a, 1 - t), vec3Mulf(b, t));
 }
 
-export function quatSlerp(a, b, t) {
+export function quatSlerp(a: Vec4, b: Vec4, t: number): Vec4 {
     let d = vec4Dot(a, b);
     if (Math.abs(d) > 0.9995) {
         return vec4Normalize(vec4Add(a, vec4Mulf(vec4Sub(b, a), t)));

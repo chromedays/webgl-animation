@@ -1,0 +1,24 @@
+{
+  "name": "cs460_webgl",
+  "version": "1.0.0",
+  "description": "",
+  "dependencies": {
+    "live-server": "^1.2.1",
+    "typescript": "^4.1.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "build": "tsc",
+    "start": "live-server --watch=dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chromedays/webgl-animation.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chromedays/webgl-animation/issues"
+  },
+  "homepage": "https://github.com/chromedays/webgl-animation#readme"
+}
