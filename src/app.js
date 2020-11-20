@@ -3,7 +3,7 @@ import * as S from './scene.js'
 import * as M from './math.js'
 
 async function main() {
-    let scene;
+    let scene = null;
     {
         let model = await loadModel();
         console.log(model);

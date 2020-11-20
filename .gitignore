@@ -1,1 +1,2 @@
-SampleAssimpReader*
+dist/*.js
+dist/*.js.map
