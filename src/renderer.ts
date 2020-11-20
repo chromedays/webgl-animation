@@ -100,7 +100,7 @@ export function setUniforms(shaderProgram: ShaderProgram, uniforms: any) {
     }
 };
 
-export function setAttribute(shaderProgram: ShaderProgram, attribName: string, buffer: number, numComponents: number, offset: number) {
+export function setAttribute(shaderProgram: ShaderProgram, attribName: string, buffer: WebGLBuffer, numComponents: number, offset: number) {
     let location = gl.getAttribLocation(shaderProgram.handle, attribName);
     if (location >= 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);

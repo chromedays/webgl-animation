@@ -1,8 +1,8 @@
 import * as R from './renderer.js'
 
-type Vec3 = [number, number, number];
-type Vec4 = [number, number, number, number];
-type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
+export type Vec3 = [number, number, number];
+export type Vec4 = [number, number, number, number];
+export type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 
 export function vec3Negate(v: Vec3): Vec3 {
     return [-v[0], -v[1], -v[2]];

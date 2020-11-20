@@ -2,23 +2,23 @@ import * as R from './renderer.js'
 import * as M from './math.js'
 
 export class Scene {
-    rootNode = null; // Node
+    rootNode: Node | null  = null;
 
-    nodes = []; // Node[]
-    meshes = []; // Mesh[]
-    animations = [] // Animation[]
+    nodes: Node[]  = [];
+    meshes: Mesh[]  = [];
+    animations: Animation[] = []
 }
 
 export class Node {
-    scene; // Scene
+    scene: Scene;
 
-    name; // string
-    meshIndices = []; // number
-    boneIndex = -1; // number
-    parentIndex = -1; // number
-    childIndices = []; // number[]
+    name: string;
+    meshIndices: number[] = [];
+    boneIndex: number  = -1;
+    parentIndex: number  = -1;
+    childIndices: number[]  = [];
 
-    transform = M.mat4Identity(); // number[]
+    transform: M.Mat4  = M.mat4Identity();
 
     hasMeshes() {
         return this.meshIndices.length > 0;
@@ -34,74 +34,74 @@ export class Node {
 }
 
 export class MeshGPU {
-    positionBuffer; // WebGLBuffer
-    normalBuffer; // WebGLBuffer
-    boneIndexBuffer; // WebGLBuffer
-    boneWeightBuffer; // WebGLBuffer
-    indexBuffer; // WebGLBuffer
+    positionBuffer: WebGLBuffer;
+    normalBuffer: WebGLBuffer;
+    boneIndexBuffer: WebGLBuffer;
+    boneWeightBuffer: WebGLBuffer;
+    indexBuffer: WebGLBuffer;
 }
 
 export class Mesh {
-    name; // string
-    positions = []; // number[]
-    normals = []; // number[]
-    indices = []; // number[]
-    bones = []; // Bone[]
+    name: string;
+    positions: number[]  = [];
+    normals: number[]  = [];
+    indices: number[]  = [];
+    bones: Bone[]  = [];
 
-    boneIndexBufferData; // number[]
-    boneWeightBufferData; // number[]
-    numBones; // number[]
+    boneIndexBufferData: number[];
+    boneWeightBufferData: number[];
+    numBones: number[];
 
-    gpu; // MeshGPU
+    gpu: MeshGPU;
 }
 
 export class VertexWeight {
-    vertexIndex; // number
-    weight; // number
+    vertexIndex: number;
+    weight: number;
 
-    constructor(vertexIndex, weight) {
+    constructor(vertexIndex: number, weight: number) {
         this.vertexIndex = vertexIndex;
         this.weight = weight;
     }
 }
 
 export class Bone {
-    name; // string
-    meshIndex; // number
-    offsetMat; // number[]
-    weights; // VertexWeight[]
+    name: string;
+    meshIndex: number;
+    offsetMat: M.Mat4;
+    weights: VertexWeight[];
 }
 
 export class Vec3Key {
-    tick; // number
-    value; // number[3]
+    tick: number;
+    value: M.Vec3;
 }
 
 export class QuatKey {
-    tick; // number
-    value; // number[4]
+    tick: number;
+    value: M.Vec4;
 }
 
 export class NodeAnim {
-    name; // string
-    positionKeys; // Vec3Key[]
-    scalingKeys; // Vec3Key[]
-    rotationKeys; // QuatKey[]
+    name: string;
+    positionKeys: Vec3Key[];
+    scalingKeys: Vec3Key[];
+    rotationKeys: QuatKey[];
 }
 
 export class Animation {
-    name; // string
-    duration; // number
-    ticksPerSecond; // number
-    channels = []; // NodeAnim[]
+    name: string;
+    duration: number;
+    ticksPerSecond: number;
+    channels = new Map<string, NodeAnim>();
 }
 
-export function parseScene(s) {
+export function parseScene(s: any) {
 
     let scene = new Scene();
     let meshBoneIndexTable = new Map();
 
-    scene.meshes = s.meshes.map((m, i) => {
+    scene.meshes = s.meshes.map((m: any, i: number) => {
         let mesh = new Mesh();
         mesh.name = m.name;
 
@@ -115,12 +115,12 @@ export function parseScene(s) {
         mesh.numBones = mesh.positions.map(_ => 0);
 
         if ('bones' in m) {
-            mesh.bones = m.bones.map((b, j) => {
+            mesh.bones = m.bones.map((b: any, j: number) => {
                 let bone = new Bone();
                 bone.name = b.name;
                 bone.meshIndex = i;
                 bone.offsetMat = M.mat4Transpose(b.offsetmatrix);
-                bone.weights = b.weights.map(w => new VertexWeight(w[0], w[1]));
+                bone.weights = b.weights.map((w: any) => new VertexWeight(w[0], w[1]));
                 meshBoneIndexTable.set(bone.name, {
                     meshIndex: i,
                     boneIndex: j,
@@ -195,7 +195,7 @@ export function parseScene(s) {
 
         parents = currNodes.map((n, i) => {
             if ('children' in n) {
-                return n.children.map(_ => scene.nodes.length + i);
+                return n.children.map(() => scene.nodes.length + i);
             } else {
                 return [];
             }
@@ -218,30 +218,30 @@ export function parseScene(s) {
 
     scene.rootNode = scene.nodes[0];
 
-    scene.animations = s.animations.map(a => {
+    scene.animations = s.animations.map((a: any) => {
         let anim = new Animation();
         anim.name = a.name;
         anim.duration = a.duration;
         anim.ticksPerSecond = a.tickspersecond;
-        anim.channels = new Map(a.channels.map(ch => {
+        anim.channels = new Map<string, NodeAnim>(a.channels.map((ch: any) => {
             let channel = new NodeAnim();
             channel.name = ch.name;
-            channel.positionKeys = ch.positionkeys.map(p => {
+            channel.positionKeys = ch.positionkeys.map((p: any) => {
                 let key = new Vec3Key();
                 key.tick = p[0];
-                key.value = [...p[1]];
+                key.value = [...(p[1] as M.Vec3)];
                 return key;
             });
-            channel.rotationKeys = ch.rotationkeys.map(r => {
+            channel.rotationKeys = ch.rotationkeys.map((r: any) => {
                 let key = new QuatKey();
                 key.tick = r[0];
                 key.value = M.quat(r[1][0], r[1].slice(1));
                 return key;
             });
-            channel.scalingKeys = ch.scalingkeys.map(s => {
+            channel.scalingKeys = ch.scalingkeys.map((s: any) => {
                 let key = new Vec3Key();
                 key.tick = s[0];
-                key.value = [...s[1]];
+                key.value = [...(s[1] as M.Vec3)];
                 return key;
             })
             return [channel.name, channel];
@@ -252,7 +252,7 @@ export function parseScene(s) {
     return scene;
 }
 
-export function drawMesh(mesh, shaderProgram, boneTransforms) {
+export function drawMesh(mesh: Mesh, shaderProgram: R.ShaderProgram, boneTransforms: M.Mat4[]) {
     R.setUniforms(shaderProgram, {
         'uBones[0]': boneTransforms.flat(),
     });
@@ -264,7 +264,12 @@ export function drawMesh(mesh, shaderProgram, boneTransforms) {
     R.gl.drawElements(R.gl.TRIANGLES, mesh.indices.length, R.gl.UNSIGNED_INT, 0);
 }
 
-export function interpolateKeyframes(keyframes, tick, lerpFunc) {
+interface KeyFrame<T> {
+    tick: number;
+    value: T; 
+}
+
+export function interpolateKeyframes<T>(keyframes: KeyFrame<T>[], tick: number, lerpFunc: (a: T, b: T, t: number) => T) {
     let value = keyframes[0].value;
 
     if (keyframes.length > 1) {
@@ -291,14 +296,14 @@ export class SceneState {
     animIndex = -1;
     tick = 0;
     drawBones = false;
-    nodeTransforms = [];
-    boneTransforms = [];
+    nodeTransforms: M.Mat4[] = [];
+    boneTransforms: M.Mat4[][] = [];
 
-    updateTransforms(scene) {
+    updateTransforms(scene: Scene) {
         this.nodeTransforms = scene.nodes.map(_ => M.mat4Identity());
         this.boneTransforms = scene.meshes.map(mesh => {
             if (mesh.bones.length > 0) {
-                return mesh.bones.map(_ => M.mat4Identity());
+                return mesh.bones.map(() => M.mat4Identity());
             } else {
                 return [M.mat4Identity()];
             }
@@ -332,7 +337,7 @@ export class SceneState {
     }
 };
 
-export function drawScene(scene, shaderProgram, viewMat, projMat, state) {
+export function drawScene(scene: Scene, shaderProgram: R.ShaderProgram, viewMat: M.Mat4, projMat: M.Mat4, state: SceneState) {
     R.gl.useProgram(shaderProgram.handle);
     R.gl.enable(R.gl.DEPTH_TEST);
     R.setUniforms(shaderProgram, {
@@ -350,12 +355,12 @@ export function drawScene(scene, shaderProgram, viewMat, projMat, state) {
 }
 
 export class DebugBoneBuffer {
-    positionBuffer; // WebGLBuffer
-    colorBuffer; // WebGLBuffer
-    indexBuffer; // WebGLBuffer
-    positions = []; // number[]
-    colors = []; // number[]
-    indices = []; // number[]
+    positionBuffer: WebGLBuffer;
+    colorBuffer: WebGLBuffer;
+    indexBuffer: WebGLBuffer;
+    positions: number[]  = [];
+    colors: number[]  = [];
+    indices: number[]  = [];
 
     constructor() {
         this.positionBuffer = R.gl.createBuffer();
@@ -363,24 +368,24 @@ export class DebugBoneBuffer {
         this.indexBuffer = R.gl.createBuffer();
     }
 
-    pushVertex(pos, color) {
+    pushVertex(pos: M.Vec3, color: M.Vec3) {
         this.positions.push(...pos);
         this.colors.push(...color);
         this.indices.push(this.indices.length);
     }
 
-    update(scene, state) {
+    update(scene: Scene, state: SceneState) {
         [this.positions, this.colors, this.indices] = [[], [], []];
 
         let roots = scene.nodes.filter(node => (node.name === 'torso' || (node.hasParent() && scene.nodes[node.parentIndex].name === 'root')));
         let currNodeIndices = roots.map(node => [...node.childIndices]).flat();
 
         while (currNodeIndices.length > 0) {
-            let currNodes = currNodeIndices.map(nodeIndex => scene.nodes[nodeIndex]);
+            let currNodes = currNodeIndices.map((nodeIndex: any) => scene.nodes[nodeIndex]);
             let parentTransforms = currNodes
                 .map(node => node.hasParent() ? state.nodeTransforms[node.parentIndex] : null);
 
-            currNodeIndices.forEach((nodeIndex, i) => {
+            currNodeIndices.forEach((nodeIndex: any, i: number) => {
                 if (scene.nodes[nodeIndex].name.includes('IK')) {
                     return;
                 }
@@ -404,7 +409,7 @@ export class DebugBoneBuffer {
         R.gl.bufferData(R.gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(this.indices), R.gl.STATIC_DRAW);
     }
 
-    draw(shaderProgram, modelMat, viewMat, projMat) {
+    draw(shaderProgram: R.ShaderProgram, modelMat: M.Mat4, viewMat: M.Mat4, projMat: M.Mat4) {
         R.gl.disable(R.gl.DEPTH_TEST);
         R.gl.useProgram(shaderProgram.handle);
         R.setUniforms(shaderProgram, {
