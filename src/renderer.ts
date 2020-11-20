@@ -39,7 +39,7 @@ export class ShaderProgram {
     }
 }
 
-export async function createShaderProgramFromFiles(vert: string, frag: string): Promise<WebGLProgram> {
+export async function createShaderProgramFromFiles(vert: string, frag: string): Promise<ShaderProgram> {
     let vertSrc = await (await fetch(vert)).text();
     let fragSrc = await (await fetch(frag)).text();
     console.log('Compiling shaders:', vert, frag,);

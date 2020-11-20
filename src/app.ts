@@ -3,7 +3,7 @@ import * as S from './scene.js'
 import * as M from './math.js'
 
 async function main() {
-    let scene = null;
+    let scene: S.Scene = null;
     {
         let model = await loadModel();
         console.log(model);
@@ -61,8 +61,8 @@ async function main() {
     })
 
 
-    let drawModelButton = document.querySelector("#draw_model");
-    let drawBonesButton = document.querySelector("#draw_bones");
+    let drawModelButton = document.querySelector("#draw_model") as HTMLInputElement;
+    let drawBonesButton = document.querySelector("#draw_bones") as HTMLInputElement;
 
     let oldTime = 0;
 
@@ -75,17 +75,17 @@ async function main() {
         camDistance += e.deltaY / 10;
     })
 
-    let tickSlider = document.querySelector('#tick');
+    let tickSlider = document.querySelector('#tick') as HTMLInputElement;
     tickSlider.addEventListener('input', e => {
         if (sceneState.animIndex < 0) {
             sceneState.tick = 0;
         } else {
             let anim = scene.animations[sceneState.animIndex];
-            sceneState.tick = e.target.value / 1000 * anim.duration;
+            sceneState.tick = +(e.target as HTMLInputElement).value / 1000 * anim.duration;
         }
     });
 
-    let autoPlayAnim = document.querySelector("#auto_play_anim");
+    let autoPlayAnim = document.querySelector("#auto_play_anim") as HTMLInputElement;
 
     let mousePressed = false;
 
@@ -112,7 +112,7 @@ async function main() {
         mousePressed = false;
     });
 
-    let draw = function (time) {
+    let draw = function (time: number) {
         let dt = (time - oldTime) * 0.001;
         framerateDisplayTimer += dt;
         if (framerateDisplayTimer > 1) {
@@ -127,7 +127,7 @@ async function main() {
             sceneState.tick += (dt * anim.ticksPerSecond);
             sceneState.tick %= anim.duration;
         }
-        tickSlider.value = anim ? sceneState.tick / anim.duration * 1000 : 0;
+        tickSlider.value = (anim ? sceneState.tick / anim.duration * 1000 : 0).toString();
 
         sceneState.drawBones = drawBonesButton.checked;
         sceneState.updateTransforms(scene);
@@ -142,7 +142,7 @@ async function main() {
         R.gl.viewport(0, 0, R.canvas.width, R.canvas.height);
 
         let camHeight = 100;
-        let camPos = [0, 0, 0];
+        let camPos: M.Vec3 = [0, 0, 0];
         camPos[0] = Math.sin(camTheta * Math.PI / 180) * Math.cos(camPhi * Math.PI / 180) * camDistance;
         camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
