@@ -79,20 +79,6 @@ export class MeshGPU {
 }
 
 export class Mesh {
-    // constructor(
-    //     public name: string,
-    //     public positions: number[] = [],
-    //     public normals: number[] = [],
-    //     public indices: number[] = [],
-    //     public bones: Bone[] = [],
-
-    //     public boneIndexBufferData: number[],
-    //     public boneWeightBufferData: number[],
-    //     public numBones: number[],
-
-    //     public gpu: MeshGPU,
-    // ) { }
-
     public name: string;
     public positions: number[];
     public normals: number[];
@@ -248,10 +234,6 @@ export function parseScene(s: any) {
                 return [];
             }
         }).flat();
-
-        // console.log('Scene Nodes:', scene.nodes);
-        // console.log('Currents:', currNodes);
-        // console.log('Parents:', parents);
     }
 
     scene.rootNode = scene.nodes[0];
