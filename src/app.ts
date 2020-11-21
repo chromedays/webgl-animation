@@ -3,13 +3,10 @@ import * as S from './scene.js'
 import * as M from './math.js'
 
 async function main() {
-    let scene: S.Scene = null;
-    {
-        let model = await loadModel();
-        console.log(model);
-        scene = S.parseScene(model);
-        console.log(scene);
-    }
+    let model = await loadModel();
+    console.log(model);
+    let scene = S.parseScene(model);
+    console.log(scene);
     let sceneState = new S.SceneState();
 
     let shaderProgram = await R.createShaderProgramFromFiles('shaders/default.vert', 'shaders/default.frag');
@@ -18,7 +15,7 @@ async function main() {
     let debugBoneBuffer = new S.DebugBoneBuffer();
 
     sceneState.animIndex = 2;
-    let animSelector = document.querySelector("#animation_selector");
+    let animSelector = document.querySelector("#animation_selector")!;
     {
         let div = document.createElement('div');
         let button = document.createElement('input');
@@ -117,7 +114,7 @@ async function main() {
         framerateDisplayTimer += dt;
         if (framerateDisplayTimer > 1) {
             framerateDisplayTimer -= 1;
-            document.querySelector('#framerate').textContent = 'FPS: ' + (1 / dt).toFixed(2);
+            document.querySelector('#framerate')!.textContent = 'FPS: ' + (1 / dt).toFixed(2);
         }
         oldTime = time;
 

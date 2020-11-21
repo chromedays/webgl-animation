@@ -2,10 +2,6 @@ export let canvas = document.querySelector('canvas')!;
 export let gl = canvas.getContext('webgl')!;
 gl.getExtension('OES_element_index_uint');
 
-export function getGLContext(): WebGLRenderingContext {
-    return gl;
-}
-
 export class UniformInfo {
     location: WebGLUniformLocation;
     type: number

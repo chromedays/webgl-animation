@@ -7,6 +7,6 @@
         "allowJs": true,
         "noEmitOnError": true,
         "strict": true,
-        "strictNullChecks": false,
+        "strictNullChecks": true,
     }
 }

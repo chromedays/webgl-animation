@@ -2,23 +2,28 @@ import * as R from './renderer.js'
 import * as M from './math.js'
 
 export class Scene {
-    rootNode: Node | null  = null;
+    rootNode: Node | null = null;
 
-    nodes: Node[]  = [];
-    meshes: Mesh[]  = [];
+    nodes: Node[] = [];
+    meshes: Mesh[] = [];
     animations: Animation[] = []
+
+    static parse(model: any) {
+    }
 }
 
 export class Node {
-    scene: Scene;
+    constructor(
+        public scene: Scene,
 
-    name: string;
-    meshIndices: number[] = [];
-    boneIndex: number  = -1;
-    parentIndex: number  = -1;
-    childIndices: number[]  = [];
+        public name: string,
+        public meshIndices: number[] = [],
+        public boneIndex: number = -1,
+        public parentIndex: number = -1,
+        public childIndices: number[] = [],
 
-    transform: M.Mat4  = M.mat4Identity();
+        public transform: M.Mat4 = M.mat4Identity()
+    ) { }
 
     hasMeshes() {
         return this.meshIndices.length > 0;
@@ -34,66 +39,153 @@ export class Node {
 }
 
 export class MeshGPU {
-    positionBuffer: WebGLBuffer;
-    normalBuffer: WebGLBuffer;
-    boneIndexBuffer: WebGLBuffer;
-    boneWeightBuffer: WebGLBuffer;
-    indexBuffer: WebGLBuffer;
-}
+    public positionBuffer: WebGLBuffer;
+    public normalBuffer: WebGLBuffer;
+    public boneIndexBuffer: WebGLBuffer;
+    public boneWeightBuffer: WebGLBuffer;
+    public indexBuffer: WebGLBuffer;
 
-export class Mesh {
-    name: string;
-    positions: number[]  = [];
-    normals: number[]  = [];
-    indices: number[]  = [];
-    bones: Bone[]  = [];
+    constructor(
+        positions: number[],
+        normals: number[],
+        boneIndices: number[],
+        boneWeights: number[],
+        indices: number[],
+    ) {
+        this.positionBuffer = R.gl.createBuffer()!;
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.positionBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(positions), R.gl.STATIC_DRAW);
 
-    boneIndexBufferData: number[];
-    boneWeightBufferData: number[];
-    numBones: number[];
+        this.normalBuffer = R.gl.createBuffer()!;
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.normalBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(normals), R.gl.STATIC_DRAW);
 
-    gpu: MeshGPU;
-}
+        this.boneIndexBuffer = R.gl.createBuffer()!;
 
-export class VertexWeight {
-    vertexIndex: number;
-    weight: number;
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.boneIndexBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(boneIndices), R.gl.STATIC_DRAW);
 
-    constructor(vertexIndex: number, weight: number) {
-        this.vertexIndex = vertexIndex;
-        this.weight = weight;
+        this.boneWeightBuffer = R.gl.createBuffer()!;
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, this.boneWeightBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(boneWeights), R.gl.STATIC_DRAW);
+
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
+
+        this.indexBuffer = R.gl.createBuffer()!;
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        R.gl.bufferData(R.gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(indices), R.gl.STATIC_DRAW);
+        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, null);
     }
 }
 
+export class Mesh {
+    // constructor(
+    //     public name: string,
+    //     public positions: number[] = [],
+    //     public normals: number[] = [],
+    //     public indices: number[] = [],
+    //     public bones: Bone[] = [],
+
+    //     public boneIndexBufferData: number[],
+    //     public boneWeightBufferData: number[],
+    //     public numBones: number[],
+
+    //     public gpu: MeshGPU,
+    // ) { }
+
+    public name: string;
+    public positions: number[];
+    public normals: number[];
+    public indices: number[];
+    public boneIndexBufferData: number[];
+    public boneWeightBufferData: number[];
+    public bones: Bone[];
+    public numBones: number[];
+    public gpu: MeshGPU;
+
+    constructor(
+        src: any,
+        meshIndex: number,
+    ) {
+        this.name = src.name;
+
+        this.indices = src.faces.flat();
+
+        this.positions = [...src.vertices];
+        this.normals = [...src.normals];
+
+        this.boneIndexBufferData = this.positions.map(_ => [0, 0, 0, 0]).flat();
+        this.boneWeightBufferData = this.positions.map(_ => [1, 0, 0, 0]).flat();
+        this.numBones = this.positions.map(_ => 0);
+
+        if ('bones' in src) {
+            this.bones = src.bones.map((b: any, i: number) => {
+                let bone = new Bone(b.name, meshIndex, M.mat4Transpose(b.offsetmatrix), b.weights.map((w: any) => new VertexWeight(w[0], w[1])));
+
+                bone.weights.forEach(w => {
+                    let index = w.vertexIndex * 4 + this.numBones[w.vertexIndex];
+                    this.boneIndexBufferData[index] = i;
+                    this.boneWeightBufferData[index] = w.weight;
+                    ++this.numBones[w.vertexIndex];
+                });
+
+                return bone;
+            });
+        } else {
+            this.bones = [];
+        }
+
+        this.gpu = new MeshGPU(this.positions, this.normals, this.indices, this.boneIndexBufferData, this.boneWeightBufferData);
+    }
+
+}
+
+export class VertexWeight {
+    constructor(
+        public vertexIndex: number,
+        public weight: number
+    ) { }
+}
+
 export class Bone {
-    name: string;
-    meshIndex: number;
-    offsetMat: M.Mat4;
-    weights: VertexWeight[];
+    constructor(
+        public name: string,
+        public meshIndex: number,
+        public offsetMat: M.Mat4,
+        public weights: VertexWeight[],
+    ) { }
 }
 
 export class Vec3Key {
-    tick: number;
-    value: M.Vec3;
+    constructor(
+        public tick: number,
+        public value: M.Vec3,
+    ) { }
 }
 
 export class QuatKey {
-    tick: number;
-    value: M.Vec4;
+    constructor(
+        public tick: number,
+        public value: M.Vec4,
+    ) { }
 }
 
 export class NodeAnim {
-    name: string;
-    positionKeys: Vec3Key[];
-    scalingKeys: Vec3Key[];
-    rotationKeys: QuatKey[];
+    constructor(
+        public name: string,
+        public positionKeys: Vec3Key[],
+        public scalingKeys: Vec3Key[],
+        public rotationKeys: QuatKey[],
+    ) { }
 }
 
 export class Animation {
-    name: string;
-    duration: number;
-    ticksPerSecond: number;
-    channels = new Map<string, NodeAnim>();
+    constructor(
+        public name: string,
+        public duration: number,
+        public ticksPerSecond: number,
+        public channels = new Map<string, NodeAnim>(),
+    ) { }
 }
 
 export function parseScene(s: any) {
@@ -102,66 +194,13 @@ export function parseScene(s: any) {
     let meshBoneIndexTable = new Map();
 
     scene.meshes = s.meshes.map((m: any, i: number) => {
-        let mesh = new Mesh();
-        mesh.name = m.name;
-
-        mesh.indices = m.faces.flat();
-
-        mesh.positions = [...m.vertices];
-        mesh.normals = [...m.normals];
-
-        mesh.boneIndexBufferData = mesh.positions.map(_ => [0, 0, 0, 0]).flat();
-        mesh.boneWeightBufferData = mesh.positions.map(_ => [1, 0, 0, 0]).flat();
-        mesh.numBones = mesh.positions.map(_ => 0);
-
-        if ('bones' in m) {
-            mesh.bones = m.bones.map((b: any, j: number) => {
-                let bone = new Bone();
-                bone.name = b.name;
-                bone.meshIndex = i;
-                bone.offsetMat = M.mat4Transpose(b.offsetmatrix);
-                bone.weights = b.weights.map((w: any) => new VertexWeight(w[0], w[1]));
-                meshBoneIndexTable.set(bone.name, {
-                    meshIndex: i,
-                    boneIndex: j,
-                });
-
-                bone.weights.forEach(w => {
-                    let index = w.vertexIndex * 4 + mesh.numBones[w.vertexIndex];
-                    mesh.boneIndexBufferData[index] = j;
-                    mesh.boneWeightBufferData[index] = w.weight;
-                    ++mesh.numBones[w.vertexIndex];
-                });
-
-                return bone;
+        let mesh = new Mesh(m, i);
+        mesh.bones.forEach((bone, boneIndex) => {
+            meshBoneIndexTable.set(bone.name, {
+                meshIndex: i,
+                boneIndex: boneIndex,
             });
-        }
-
-        mesh.gpu = new MeshGPU();
-        mesh.gpu.positionBuffer = R.gl.createBuffer();
-        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.positionBuffer);
-        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.positions), R.gl.STATIC_DRAW);
-
-        mesh.gpu.normalBuffer = R.gl.createBuffer();
-        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.normalBuffer);
-        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.normals), R.gl.STATIC_DRAW);
-
-        mesh.gpu.boneIndexBuffer = R.gl.createBuffer()
-
-        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.boneIndexBuffer);
-        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.boneIndexBufferData), R.gl.STATIC_DRAW);
-
-        mesh.gpu.boneWeightBuffer = R.gl.createBuffer()
-        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, mesh.gpu.boneWeightBuffer);
-        R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(mesh.boneWeightBufferData), R.gl.STATIC_DRAW);
-
-        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
-
-        mesh.gpu.indexBuffer = R.gl.createBuffer();
-        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, mesh.gpu.indexBuffer);
-        R.gl.bufferData(R.gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mesh.indices), R.gl.STATIC_DRAW);
-        R.gl.bindBuffer(R.gl.ELEMENT_ARRAY_BUFFER, null);
-
+        });
         return mesh;
     });
 
@@ -169,9 +208,8 @@ export function parseScene(s: any) {
     let currNodes = [s.rootnode];
     while (currNodes.length > 0) {
         let newNodes = currNodes.map((n, i) => {
-            let node = new Node();
-            node.scene = scene;
-            let boneKey = node.name = n.name;
+            let node = new Node(scene, n.name);
+            let boneKey = node.name;
             if (meshBoneIndexTable.has(boneKey)) {
                 let { meshIndex, boneIndex } = meshBoneIndexTable.get(boneKey);
                 node.meshIndices = [meshIndex];
@@ -219,33 +257,27 @@ export function parseScene(s: any) {
     scene.rootNode = scene.nodes[0];
 
     scene.animations = s.animations.map((a: any) => {
-        let anim = new Animation();
-        anim.name = a.name;
-        anim.duration = a.duration;
-        anim.ticksPerSecond = a.tickspersecond;
-        anim.channels = new Map<string, NodeAnim>(a.channels.map((ch: any) => {
-            let channel = new NodeAnim();
-            channel.name = ch.name;
-            channel.positionKeys = ch.positionkeys.map((p: any) => {
-                let key = new Vec3Key();
-                key.tick = p[0];
-                key.value = [...(p[1] as M.Vec3)];
-                return key;
-            });
-            channel.rotationKeys = ch.rotationkeys.map((r: any) => {
-                let key = new QuatKey();
-                key.tick = r[0];
-                key.value = M.quat(r[1][0], r[1].slice(1));
-                return key;
-            });
-            channel.scalingKeys = ch.scalingkeys.map((s: any) => {
-                let key = new Vec3Key();
-                key.tick = s[0];
-                key.value = [...(s[1] as M.Vec3)];
-                return key;
-            })
-            return [channel.name, channel];
-        }));
+        let anim = new Animation(
+            a.name,
+            a.duration,
+            a.tickspersecond,
+            new Map<string, NodeAnim>(a.channels.map((ch: any) => {
+                let channel = new NodeAnim(ch.name,
+                    ch.positionkeys.map((p: any) => {
+                        let key = new Vec3Key(p[0], [...(p[1] as M.Vec3)]);
+                        return key;
+                    }),
+                    ch.scalingkeys.map((s: any) => {
+                        let key = new Vec3Key(s[0], [...(s[1] as M.Vec3)]);
+                        return key;
+                    }),
+                    ch.rotationkeys.map((r: any) => {
+                        let key = new QuatKey(r[0], M.quat(r[1][0], r[1].slice(1)));
+                        return key;
+                    }));
+                return [channel.name, channel];
+            }))
+        );
         return anim;
     });
 
@@ -266,7 +298,7 @@ export function drawMesh(mesh: Mesh, shaderProgram: R.ShaderProgram, boneTransfo
 
 interface KeyFrame<T> {
     tick: number;
-    value: T; 
+    value: T;
 }
 
 export function interpolateKeyframes<T>(keyframes: KeyFrame<T>[], tick: number, lerpFunc: (a: T, b: T, t: number) => T) {
@@ -314,7 +346,7 @@ export class SceneState {
         scene.nodes.forEach((node, nodeIndex) => {
             if (node.hasParent()) {
                 if (anim && anim.channels.has(node.name)) {
-                    let channel = anim.channels.get(node.name);
+                    let channel = anim.channels.get(node.name)!;
                     let v = interpolateKeyframes(channel.positionKeys, this.tick, M.vec3Lerp);
                     let q = interpolateKeyframes(channel.rotationKeys, this.tick, M.quatSlerp);
                     let s = interpolateKeyframes(channel.scalingKeys, this.tick, M.vec3Lerp);
@@ -358,14 +390,14 @@ export class DebugBoneBuffer {
     positionBuffer: WebGLBuffer;
     colorBuffer: WebGLBuffer;
     indexBuffer: WebGLBuffer;
-    positions: number[]  = [];
-    colors: number[]  = [];
-    indices: number[]  = [];
+    positions: number[] = [];
+    colors: number[] = [];
+    indices: number[] = [];
 
     constructor() {
-        this.positionBuffer = R.gl.createBuffer();
-        this.colorBuffer = R.gl.createBuffer();
-        this.indexBuffer = R.gl.createBuffer();
+        this.positionBuffer = R.gl.createBuffer()!;
+        this.colorBuffer = R.gl.createBuffer()!;
+        this.indexBuffer = R.gl.createBuffer()!;
     }
 
     pushVertex(pos: M.Vec3, color: M.Vec3) {
@@ -386,12 +418,14 @@ export class DebugBoneBuffer {
                 .map(node => node.hasParent() ? state.nodeTransforms[node.parentIndex] : null);
 
             currNodeIndices.forEach((nodeIndex: any, i: number) => {
-                if (scene.nodes[nodeIndex].name.includes('IK')) {
+                if (parentTransforms[i] == null || scene.nodes[nodeIndex].name.includes('IK')) {
                     return;
                 }
 
+                let parentTransform = parentTransforms[i]!;
+
                 this.pushVertex(
-                    [parentTransforms[i][12], parentTransforms[i][13], parentTransforms[i][14]],
+                    [parentTransform[12], parentTransform[13], parentTransform[14]],
                     [1, 1, 0]);
                 this.pushVertex(
                     [state.nodeTransforms[nodeIndex][12], state.nodeTransforms[nodeIndex][13], state.nodeTransforms[nodeIndex][14]],
