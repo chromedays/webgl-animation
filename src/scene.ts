@@ -135,7 +135,7 @@ export class Mesh {
             this.bones = [];
         }
 
-        this.gpu = new MeshGPU(this.positions, this.normals, this.indices, this.boneIndexBufferData, this.boneWeightBufferData);
+        this.gpu = new MeshGPU(this.positions, this.normals, this.boneIndexBufferData, this.boneWeightBufferData, this.indices);
     }
 
 }
