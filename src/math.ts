@@ -4,6 +4,14 @@ export type Vec3 = [number, number, number];
 export type Vec4 = [number, number, number, number];
 export type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 
+export function degToRad(d: number): number {
+    return d * Math.PI / 180;
+}
+
+export function radToDeg(r: number): number {
+    return r * 180 / Math.PI;
+}
+
 export function vec3Negate(v: Vec3): Vec3 {
     return [-v[0], -v[1], -v[2]];
 }
@@ -70,11 +78,11 @@ export function vec4Normalize(v: Vec4): Vec4 {
 
 export function mat4Identity(): Mat4 {
     return [
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
-];
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+    ];
 }
 
 export function mat4Multiply(a: Mat4, b: Mat4): Mat4 {
@@ -220,4 +228,75 @@ export function quatSlerp(a: Vec4, b: Vec4, t: number): Vec4 {
     let angle = Math.acos(d);
 
     return vec4Mulf(vec4Add(vec4Mulf(a, Math.sin((1 - t) * angle)), vec4Mulf(b, Math.sin(t * angle))), 1 / Math.sin(angle));
+}
+
+export class AdaptiveCurve {
+    table: number[][] = [[0, 0]];
+    maxArcLength: number = 0;
+
+    constructor(controlPoints: Vec3[], tolerance: number) {
+        console.assert(controlPoints.length >= 4); // Accepts 4 control points only
+
+        let segments = [[0, 1]];
+        while (segments.length > 0) {
+            let [sa, sb] = segments.shift()!;
+            let sm = (sa + sb) / 2;
+            let pa = interpolateCurvePosition(controlPoints, sa);
+            let pb = interpolateCurvePosition(controlPoints, sb);
+            let pm = interpolateCurvePosition(controlPoints, sm);
+            let la = vec3Length(vec3Sub(pm, pa));
+            let lb = vec3Length(vec3Sub(pb, pm));
+            let lc = vec3Length(vec3Sub(pb, pa))
+            let d = la + lb - lc;
+            if (d < tolerance) {
+                let prevLength = this.table[this.table.length - 1][1];
+                this.table.push([sm, prevLength + la], [sb, prevLength + la + lb]);
+                // console.log(sa, sm, sb, prevLength);
+            } else {
+                segments.unshift([sa, sm], [sm, sb]);
+            }
+            // let buf : string = '';
+            // segments.forEach((s) => {
+            //     buf += `(${s[0]}-${s[1]}) `;
+            // });
+            // console.log(buf);
+        }
+
+        let maxS = 0;
+        this.table.forEach(e => {
+            if (e[0] > maxS) {
+                maxS = e[0];
+                this.maxArcLength = e[1];
+            }
+        });
+    }
+}
+
+export function interpolateCurvePosition(controlPoints: Vec3[], t: number): Vec3 {
+    console.assert(controlPoints.length >= 4); // Accepts 4 control points only
+
+    let t3 = t ** 3;
+    let t2 = t ** 2;
+    let a = vec3Mulf(controlPoints[0], -t3 + 3 * t2 - 3 * t + 1);
+    let b = vec3Mulf(controlPoints[1], 3 * t3 - 6 * t2 + 3 * t);
+    let c = vec3Mulf(controlPoints[2], -3 * t3 + 3 * t2);
+    let d = vec3Mulf(controlPoints[3], t3);
+
+    let result = vec3Add(vec3Add(vec3Add(a, b), c), d);
+
+    return result;
+}
+
+export function interpolateCurveDirection(controlPoints: Vec3[], t: number): Vec3 {
+    console.assert(controlPoints.length >= 4); // Accepts 4 control points only
+
+    let t2 = t ** 2;
+    let a = vec3Mulf(controlPoints[0], -3 * t2 + 6 * t - 3);
+    let b = vec3Mulf(controlPoints[1], 9 * t2 - 12 * t + 3);
+    let c = vec3Mulf(controlPoints[2], -9 * t2 + 6 * t);
+    let d = vec3Mulf(controlPoints[3], 3 * t2);
+
+    let result = vec3Add(vec3Add(vec3Add(a, b), c), d);
+    result = vec3Normalize(result);
+    return result;
 }

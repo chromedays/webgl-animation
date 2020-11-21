@@ -351,11 +351,11 @@ export class SceneState {
     }
 };
 
-export function drawScene(scene: Scene, shaderProgram: R.ShaderProgram, viewMat: M.Mat4, projMat: M.Mat4, state: SceneState) {
+export function drawScene(scene: Scene, shaderProgram: R.ShaderProgram, modelMat: M.Mat4, viewMat: M.Mat4, projMat: M.Mat4, state: SceneState) {
     R.gl.useProgram(shaderProgram.handle);
     R.gl.enable(R.gl.DEPTH_TEST);
     R.setUniforms(shaderProgram, {
-        'uModelMat': M.mat4Identity(),
+        'uModelMat': modelMat,
         'uViewMat': viewMat,
         'uProjMat': projMat,
     });

@@ -1,6 +1,8 @@
 import * as R from './renderer.js'
 import * as S from './scene.js'
 import * as M from './math.js'
+import { AdaptiveCurve, interpolateCurveDirection, interpolateCurvePosition, mat4LookAt, mat4Multiply, mat4Scale, mat4Translate, mat4Transpose, quatRotateAroundAxis, Vec3, vec3Mulf, vec3Negate } from './math.js';
+import { gl } from './renderer.js';
 
 async function main() {
     let model = await loadModel();
@@ -11,6 +13,7 @@ async function main() {
 
     let shaderProgram = await R.createShaderProgramFromFiles('shaders/default.vert', 'shaders/default.frag');
     let debugBonesShaderProgram = await R.createShaderProgramFromFiles('shaders/debug_bones.vert', 'shaders/debug_bones.frag');
+    let unlitProgram = await R.createShaderProgramFromFiles('shaders/unlit.vert', 'shaders/unlit.frag');
 
     let debugBoneBuffer = new S.DebugBoneBuffer();
 
@@ -65,7 +68,7 @@ async function main() {
 
     let framerateDisplayTimer = 1;
 
-    let camDistance = 300;
+    let camDistance = 30;
 
     R.canvas.addEventListener('wheel', (e) => {
         e.preventDefault();
@@ -73,7 +76,9 @@ async function main() {
     })
 
     let tickSlider = document.querySelector('#tick') as HTMLInputElement;
+    let testT = 0;
     tickSlider.addEventListener('input', e => {
+        testT = +(e.target as HTMLInputElement).value / 1000;
         if (sceneState.animIndex < 0) {
             sceneState.tick = 0;
         } else {
@@ -83,6 +88,7 @@ async function main() {
     });
 
     let autoPlayAnim = document.querySelector("#auto_play_anim") as HTMLInputElement;
+
 
     let mousePressed = false;
 
@@ -108,6 +114,55 @@ async function main() {
     R.canvas.addEventListener('mouseup', () => {
         mousePressed = false;
     });
+
+    let controlPoints: Vec3[] =
+        [
+            [-2, 0, -2],
+            [-2, 0, 2],
+            [1, 0, 2],
+            [3, 0, 1],
+        ];
+    let controlColors: Vec3[] =
+        [
+            [1, 0, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+            [1, 0, 0],
+        ];
+    controlPoints = controlPoints.map(p => vec3Mulf(p, 10));
+    let controlPointBuffer = R.gl.createBuffer()!;
+    let controlColorBuffer = R.gl.createBuffer()!;
+    R.gl.bindBuffer(R.gl.ARRAY_BUFFER, controlPointBuffer);
+    R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(controlPoints.flat()), R.gl.STATIC_DRAW);
+    R.gl.bindBuffer(R.gl.ARRAY_BUFFER, controlColorBuffer);
+    R.gl.bufferData(R.gl.ARRAY_BUFFER, new Float32Array(controlColors.flat()), R.gl.STATIC_DRAW);
+    R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
+
+    let curvePointBuffer = gl.createBuffer()!;
+    let curveColorBuffer = gl.createBuffer()!;
+    let numCurvePoints = 0;
+    let curveSlider = document.querySelector("#curve_t") as HTMLInputElement;
+    let curveTolerance = +curveSlider.value / 1000;
+
+    function updateCurvePoints() {
+        let temp = new AdaptiveCurve(controlPoints, curveTolerance);
+
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, curvePointBuffer);
+        R.gl.bufferData(R.gl.ARRAY_BUFFER,
+            new Float32Array(temp.table.map(e => interpolateCurvePosition(controlPoints, e[0])).flat()), R.gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, curveColorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER,
+            new Float32Array(temp.table.map(e => [e[1] / temp.maxArcLength, 1, 1 - e[1] / temp.maxArcLength]).flat()), gl.STATIC_DRAW);
+        numCurvePoints = temp.table.length;
+        R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
+    }
+
+    updateCurvePoints();
+
+    curveSlider.addEventListener('input', e => {
+        curveTolerance = +(e.target as HTMLInputElement).value / 1000;
+        updateCurvePoints();
+    })
 
     let draw = function (time: number) {
         let dt = (time - oldTime) * 0.001;
@@ -138,21 +193,41 @@ async function main() {
         R.gl.clear(R.gl.COLOR_BUFFER_BIT | R.gl.DEPTH_BUFFER_BIT);
         R.gl.viewport(0, 0, R.canvas.width, R.canvas.height);
 
-        let camHeight = 100;
+        let camHeight = 1;
         let camPos: M.Vec3 = [0, 0, 0];
         camPos[0] = Math.sin(camTheta * Math.PI / 180) * Math.cos(camPhi * Math.PI / 180) * camDistance;
         camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
+        let modelPos = interpolateCurvePosition(controlPoints, testT);
+        let modelRot = mat4Transpose(mat4LookAt([0, 0, 0], vec3Negate(interpolateCurveDirection(controlPoints, testT)), [0, 1, 0]));
+        let modelMat = mat4Multiply(mat4Translate(modelPos), mat4Multiply(modelRot, mat4Scale([0.1, 0.1, 0.1])));
         let viewMat = M.mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
         let projMat = M.mat4Perspective();
 
         if (drawModelButton.checked) {
-            S.drawScene(scene, shaderProgram, viewMat, projMat, sceneState);
+            S.drawScene(scene, shaderProgram, modelMat, viewMat, projMat, sceneState);
         }
+
         if (sceneState.drawBones) {
-            debugBoneBuffer.draw(debugBonesShaderProgram, M.mat4Identity(), viewMat, projMat);
+            debugBoneBuffer.draw(debugBonesShaderProgram, modelMat, viewMat, projMat);
         }
+
+        R.gl.useProgram(unlitProgram.handle);
+        R.setUniforms(unlitProgram, {
+            'uModelMat': M.mat4Identity(),
+            'uViewMat': viewMat,
+            'uProjMat': projMat,
+            'uPointSize': 10.0,
+        });
+
+        R.setAttribute(unlitProgram, 'aPos', controlPointBuffer, 3, 0);
+        R.setAttribute(unlitProgram, 'aColor', controlColorBuffer, 3, 0);
+        R.gl.drawArrays(R.gl.LINE_STRIP, 0, 4);
+
+        R.setAttribute(unlitProgram, 'aColor', curveColorBuffer, 3, 0);
+        R.setAttribute(unlitProgram, 'aPos', curvePointBuffer, 3, 0);
+        R.gl.drawArrays(R.gl.LINE_STRIP, 0, numCurvePoints);
 
         window.requestAnimationFrame(draw);
     };

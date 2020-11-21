@@ -1,3 +1,5 @@
+import * as M from './math.js'
+
 export let canvas = document.querySelector('canvas')!;
 export let gl = canvas.getContext('webgl')!;
 gl.getExtension('OES_element_index_uint');
@@ -89,6 +91,10 @@ export function setUniforms(shaderProgram: ShaderProgram, uniforms: any) {
             let info = shaderProgram.uniformTable.get(key)!;
             if (info.type === gl.FLOAT_MAT4) {
                 gl.uniformMatrix4fv(info.location, false, value);
+            } else if (info.type === gl.FLOAT_VEC3) {
+                gl.uniform3f(info.location, value[0], value[1], value[2]);
+            } else if (info.type === gl.FLOAT) {
+                gl.uniform1f(info.location, value);
             }
         } else {
             console.error(shaderProgram, "doesn't have uniform", key);
