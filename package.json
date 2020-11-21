@@ -9,7 +9,7 @@
   "devDependencies": {},
   "scripts": {
     "build": "tsc",
-    "start": "live-server --watch=dist"
+    "start": "tsc && live-server --watch=dist"
   },
   "repository": {
     "type": "git",
