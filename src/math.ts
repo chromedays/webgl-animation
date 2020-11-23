@@ -270,6 +270,20 @@ export class AdaptiveCurve {
             }
         });
     }
+
+    getT(targetArcLength: number) {
+        for (let i = 1; i < this.table.length; ++i) {
+            let prevArcLength = this.table[i - 1][1];
+            let arclength = this.table[i][1];
+            if (targetArcLength >= prevArcLength && targetArcLength <= arclength) {
+                let alpha = (targetArcLength - prevArcLength) / (arclength - prevArcLength);
+                let t = this.table[i - 1][0] + alpha * (this.table[i][0] - this.table[i - 1][0]);
+                return t;
+            }
+        }
+
+        return null;
+    }
 }
 
 export function interpolateCurvePosition(controlPoints: Vec3[], t: number): Vec3 {

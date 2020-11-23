@@ -76,9 +76,7 @@ async function main() {
     })
 
     let tickSlider = document.querySelector('#tick') as HTMLInputElement;
-    let testT = 0;
     tickSlider.addEventListener('input', e => {
-        testT = +(e.target as HTMLInputElement).value / 1000;
         if (sceneState.animIndex < 0) {
             sceneState.tick = 0;
         } else {
@@ -117,7 +115,7 @@ async function main() {
 
     let controlPoints: Vec3[] =
         [
-            [-2, 0, -2],
+            [-2, 0, -20],
             [-2, 0, 2],
             [1, 0, 2],
             [3, 0, 1],
@@ -143,17 +141,18 @@ async function main() {
     let numCurvePoints = 0;
     let curveSlider = document.querySelector("#curve_t") as HTMLInputElement;
     let curveTolerance = +curveSlider.value / 1000;
+    let curve: AdaptiveCurve | null = null;
 
     function updateCurvePoints() {
-        let temp = new AdaptiveCurve(controlPoints, curveTolerance);
+        curve = new AdaptiveCurve(controlPoints, curveTolerance);
 
         R.gl.bindBuffer(R.gl.ARRAY_BUFFER, curvePointBuffer);
         R.gl.bufferData(R.gl.ARRAY_BUFFER,
-            new Float32Array(temp.table.map(e => interpolateCurvePosition(controlPoints, e[0])).flat()), R.gl.STATIC_DRAW);
+            new Float32Array(curve.table.map(e => interpolateCurvePosition(controlPoints, e[0])).flat()), R.gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, curveColorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER,
-            new Float32Array(temp.table.map(e => [e[1] / temp.maxArcLength, 1, 1 - e[1] / temp.maxArcLength]).flat()), gl.STATIC_DRAW);
-        numCurvePoints = temp.table.length;
+            new Float32Array(curve.table.map(e => [e[1] / curve!.maxArcLength, 1, 1 - e[1] / curve!.maxArcLength]).flat()), gl.STATIC_DRAW);
+        numCurvePoints = curve.table.length;
         R.gl.bindBuffer(R.gl.ARRAY_BUFFER, null);
     }
 
@@ -176,7 +175,7 @@ async function main() {
         let anim = sceneState.animIndex >= 0 ? scene.animations[sceneState.animIndex] : null;
 
         if (autoPlayAnim.checked && anim) {
-            sceneState.tick += (dt * anim.ticksPerSecond);
+            sceneState.tick += (dt * anim.ticksPerSecond * 0.3);
             sceneState.tick %= anim.duration;
         }
         tickSlider.value = (anim ? sceneState.tick / anim.duration * 1000 : 0).toString();
@@ -199,8 +198,11 @@ async function main() {
         camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
 
-        let modelPos = interpolateCurvePosition(controlPoints, testT);
-        let modelRot = mat4Transpose(mat4LookAt([0, 0, 0], vec3Negate(interpolateCurveDirection(controlPoints, testT)), [0, 1, 0]));
+        let t = +tickSlider.value / 1000;
+        let arcLength = t * curve!.maxArcLength;
+        t = curve!.getT(arcLength)!;
+        let modelPos = interpolateCurvePosition(controlPoints, t);
+        let modelRot = mat4Transpose(mat4LookAt([0, 0, 0], vec3Negate(interpolateCurveDirection(controlPoints, t)), [0, 1, 0]));
         let modelMat = mat4Multiply(mat4Translate(modelPos), mat4Multiply(modelRot, mat4Scale([0.1, 0.1, 0.1])));
         let viewMat = M.mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
         let projMat = M.mat4Perspective();
@@ -223,7 +225,8 @@ async function main() {
 
         R.setAttribute(unlitProgram, 'aPos', controlPointBuffer, 3, 0);
         R.setAttribute(unlitProgram, 'aColor', controlColorBuffer, 3, 0);
-        R.gl.drawArrays(R.gl.LINE_STRIP, 0, 4);
+        gl.drawArrays(gl.LINE_STRIP, 0, 4);
+        gl.drawArrays(gl.POINTS, 0, 4);
 
         R.setAttribute(unlitProgram, 'aColor', curveColorBuffer, 3, 0);
         R.setAttribute(unlitProgram, 'aPos', curvePointBuffer, 3, 0);
