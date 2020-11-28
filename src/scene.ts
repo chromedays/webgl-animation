@@ -309,6 +309,7 @@ export function interpolateKeyframes<T>(keyframes: KeyFrame<T>[], tick: number, 
 export class SceneState {
     animIndex = -1;
     tick = 0;
+    drawModel = true;
     drawBones = false;
     nodeTransforms: M.Mat4[] = [];
     boneTransforms: M.Mat4[][] = [];

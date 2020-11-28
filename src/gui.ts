@@ -24,9 +24,8 @@ export function html(tokens: TemplateStringsArray, ...values: (number | string |
         htmlString += tokens[i];
     }
 
-    let temp = document.createElement('div');
-    temp.innerHTML = htmlString;
-    let htmlNode = temp.firstElementChild! as HTMLElement;
+    let htmlNode = document.createElement('div');
+    htmlNode.innerHTML = htmlString;
 
     callbacks.forEach((cb, i) => {
         let node = htmlNode.querySelector(`[${cb[0]}="${i}"]`)!;
@@ -34,7 +33,7 @@ export function html(tokens: TemplateStringsArray, ...values: (number | string |
         node.removeAttribute(cb[0]);
     })
 
-    console.log(htmlNode.innerHTML);
+    // console.log(htmlNode.innerHTML);
     children.forEach((child, i) => {
         let nodes =
             [htmlNode, ...htmlNode.querySelectorAll('*')];
@@ -60,6 +59,16 @@ export function html(tokens: TemplateStringsArray, ...values: (number | string |
     return htmlNode;
 }
 
+export function input(label: string, id: string, type: string, extraAttributeString: string, checked: boolean, onClick: (b: boolean) => void) {
+    return html`
+    <input id="${id}" type="${type}" ${extraAttributeString} ${checked ? 'checked': ''} ${['click', () => {
+        // checked = !checked; onClick(checked);
+        console.log('test');
+    }]}>
+    <label for="${id}"">${label}</label>
+    `;
+}
+
 export function animationSelector(scene: Scene, sceneState: SceneState): HTMLElement {
     let onClick = (animIndex: number) => {
         sceneState.animIndex = animIndex;
@@ -71,17 +80,27 @@ export function animationSelector(scene: Scene, sceneState: SceneState): HTMLEle
         <div>Select Animation: </div>
         ${[{ name: 'Idle', index: -1 }, ...scene.animations.map((anim, animIndex) => ({ name: anim.name, index: animIndex }))]
             .map(animInfo => html`
-        <div>
-            <input 
-                    id=${animInfo.name}
-                    type="radio"
-                    name="anim"
-                    ${animInfo.index === sceneState.animIndex ? 'checked' : ''}
-                    ${['click', () => onClick(animInfo.index)]}>
-            <label for="${animInfo.name}">${animInfo.name}</label>
-        </div>`)}
+        ${input(animInfo.name, animInfo.name, "radio", 'name="anim"', animInfo.index === sceneState.animIndex, _ => onClick(animInfo.index))}`)}
     </div>`;
 }
+
+export function visibilityController(onToggleModel: (b: boolean) => void, onToggleBones: (b: boolean) => void): HTMLElement {
+    return html`
+    <div>
+        <div>
+            Visibility Options:
+        </div>
+        ${input('Draw Model', 'draw_model', 'checkbox', '', true, b => onToggleModel(b))}
+        ${input('Draw Bones', 'draw_bones', 'checkbox', '', false, b => onToggleBones(b))}
+    </div>
+    `;
+}
+
+export function animationPlayer(): HTMLElement {return html``;}
+
+export function curveController(): HTMLElement {return html``;}
+
+export function frameRate(): HTMLElement {return html``;}
 
 // class AnimationSelector extends Widget{
 //     constructor(

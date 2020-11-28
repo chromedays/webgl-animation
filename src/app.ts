@@ -3,7 +3,7 @@ import * as S from './scene.js'
 import * as M from './math.js'
 import { AdaptiveCurve, interpolateCurveDirection, interpolateCurvePosition, mat4LookAt, mat4Multiply, mat4Scale, mat4Translate, mat4Transpose, quatRotateAroundAxis, Vec3, vec3Mulf, vec3Negate } from './math.js';
 import { gl } from './renderer.js';
-import { animationSelector, html } from './gui.js';
+import { visibilityController, animationSelector, html, animationPlayer, curveController, frameRate } from './gui.js';
 
 async function main() {
     // let testNode = html`
@@ -19,6 +19,7 @@ async function main() {
 
     // console.log(testNode);
     // document.querySelector('#sidebar')!.appendChild(testNode);
+
 
     let model = await loadModel();
     console.log(model);
@@ -36,8 +37,25 @@ async function main() {
     let animSelector = animationSelector(scene, sceneState);
     document.querySelector("#animation_selector_root")?.appendChild(animSelector);
 
-    let drawModelButton = document.querySelector("#draw_model") as HTMLInputElement;
-    let drawBonesButton = document.querySelector("#draw_bones") as HTMLInputElement;
+    document.querySelector("#animation_selector_root")?.appendChild(
+        visibilityController(b => { console.log('ha'); sceneState.drawModel = b; }, b => { sceneState.drawBones = b; }));
+
+    //     let sidebar = html`
+    //     <div>
+    //         ${animationSelector(scene, sceneState)}
+    //         <hr class="dotted">
+    //         ${visibilityController()}
+    //         <hr class="dotted">
+    //         ${animationPlayer()}
+    //         <hr class="dotted">
+    //         ${curveController()}
+    //         <hr class="dotted">
+    //         ${frameRate()}
+    //     <div>
+    // `;
+
+    // let drawModelButton = document.querySelector("#draw_model") as HTMLInputElement;
+    // let drawBonesButton = document.querySelector("#draw_bones") as HTMLInputElement;
 
     let oldTime = 0;
 
@@ -154,7 +172,6 @@ async function main() {
         }
         tickSlider.value = (anim ? sceneState.tick / anim.duration * 1000 : 0).toString();
 
-        sceneState.drawBones = drawBonesButton.checked;
         sceneState.updateTransforms(scene);
         debugBoneBuffer.update(scene, sceneState);
 
@@ -181,7 +198,7 @@ async function main() {
         let viewMat = M.mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
         let projMat = M.mat4Perspective();
 
-        if (drawModelButton.checked) {
+        if (sceneState.drawModel) {
             S.drawScene(scene, shaderProgram, modelMat, viewMat, projMat, sceneState);
         }
 
