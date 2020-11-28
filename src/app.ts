@@ -3,8 +3,23 @@ import * as S from './scene.js'
 import * as M from './math.js'
 import { AdaptiveCurve, interpolateCurveDirection, interpolateCurvePosition, mat4LookAt, mat4Multiply, mat4Scale, mat4Translate, mat4Transpose, quatRotateAroundAxis, Vec3, vec3Mulf, vec3Negate } from './math.js';
 import { gl } from './renderer.js';
+import { animationSelector, html } from './gui.js';
 
 async function main() {
+    // let testNode = html`
+    // <div>
+    //     <div>${"thisistext"}</div>
+    //     <div>${1.1234}</div>
+    //     <input type="checkbox" id="temp" ${['click', () => {console.log('clicked!!!!!!');}]}>
+    //     <div>This is list..</div>
+    //     <ul>
+    //         ${[...Array(10).keys()].map(i => html`<li>Item ${i}</li>`)}
+    //     </ul>
+    // </div>`;
+
+    // console.log(testNode);
+    // document.querySelector('#sidebar')!.appendChild(testNode);
+
     let model = await loadModel();
     console.log(model);
     let scene = S.parseScene(model);
@@ -18,48 +33,8 @@ async function main() {
     let debugBoneBuffer = new S.DebugBoneBuffer();
 
     sceneState.animIndex = 2;
-    let animSelector = document.querySelector("#animation_selector")!;
-    {
-        let div = document.createElement('div');
-        let button = document.createElement('input');
-        button.id = "Idle"
-        button.setAttribute('type', 'radio');
-        button.setAttribute('name', 'anim');
-        if (sceneState.animIndex === -1) {
-            button.checked = true;
-        }
-        let label = document.createElement('label');
-        label.setAttribute('for', button.id);
-        label.innerHTML = "Idle"
-        button.addEventListener('click', () => {
-            sceneState.animIndex = -1;
-            sceneState.tick = 0;
-        });
-        div.appendChild(button);
-        div.appendChild(label);
-        animSelector.appendChild(div);
-    }
-    scene.animations.forEach((anim, i) => {
-        let div = document.createElement('div');
-        let button = document.createElement('input');
-        button.id = anim.name;
-        button.setAttribute('type', 'radio');
-        button.setAttribute('name', 'anim');
-        if (sceneState.animIndex === i) {
-            button.checked = true;
-        }
-        let label = document.createElement('label');
-        label.setAttribute('for', button.id);
-        label.innerHTML = anim.name;
-        button.addEventListener('click', () => {
-            sceneState.animIndex = i;
-            sceneState.tick = 0;
-        });
-        div.appendChild(button);
-        div.appendChild(label);
-        animSelector.appendChild(div);
-    })
-
+    let animSelector = animationSelector(scene, sceneState);
+    document.querySelector("#animation_selector_root")?.appendChild(animSelector);
 
     let drawModelButton = document.querySelector("#draw_model") as HTMLInputElement;
     let drawBonesButton = document.querySelector("#draw_bones") as HTMLInputElement;
@@ -86,7 +61,6 @@ async function main() {
     });
 
     let autoPlayAnim = document.querySelector("#auto_play_anim") as HTMLInputElement;
-
 
     let mousePressed = false;
 
