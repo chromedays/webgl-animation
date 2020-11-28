@@ -33,7 +33,7 @@ async function main() {
         label.innerHTML = "Idle"
         button.addEventListener('click', () => {
             sceneState.animIndex = -1;
-            sceneState.tick = 0;
+            sceneState.animTick = 0;
         });
         div.appendChild(button);
         div.appendChild(label);
@@ -53,13 +53,12 @@ async function main() {
         label.innerHTML = anim.name;
         button.addEventListener('click', () => {
             sceneState.animIndex = i;
-            sceneState.tick = 0;
+            sceneState.animTick = 0;
         });
         div.appendChild(button);
         div.appendChild(label);
         animSelector.appendChild(div);
     })
-
 
     let drawModelButton = document.querySelector("#draw_model") as HTMLInputElement;
     let drawBonesButton = document.querySelector("#draw_bones") as HTMLInputElement;
@@ -75,18 +74,35 @@ async function main() {
         camDistance += e.deltaY / 10;
     })
 
-    let tickSlider = document.querySelector('#tick') as HTMLInputElement;
-    tickSlider.addEventListener('input', e => {
+    let autoPlayAnim = document.querySelector("#auto_play_anim") as HTMLInputElement;
+
+    let animSpeedSlider = document.querySelector('#anim_speed') as HTMLInputElement;
+    let animSpeed = +animSpeedSlider.value;
+    animSpeedSlider.addEventListener('input', e => {
+        animSpeed = +(e.target as HTMLInputElement).value;
+    });
+
+    let animTickSlider = document.querySelector('#anim_tick') as HTMLInputElement;
+    animTickSlider.addEventListener('input', e => {
         if (sceneState.animIndex < 0) {
-            sceneState.tick = 0;
+            sceneState.animTick = 0;
         } else {
             let anim = scene.animations[sceneState.animIndex];
-            sceneState.tick = +(e.target as HTMLInputElement).value / 1000 * anim.duration;
+            sceneState.animTick = +(e.target as HTMLInputElement).value * anim.duration;
         }
     });
 
-    let autoPlayAnim = document.querySelector("#auto_play_anim") as HTMLInputElement;
-
+    let autoMove = document.querySelector('#auto_move') as HTMLInputElement;
+    let pathSpeedSlider = document.querySelector('#path_speed') as HTMLInputElement;
+    let pathSpeed = +pathSpeedSlider.value;
+    pathSpeedSlider.addEventListener('input', e=> {
+        pathSpeed = +(e.target as HTMLInputElement).value;
+    })
+    let pathTickSlider = document.querySelector('#path_tick') as HTMLInputElement;
+    let pathTick = 0;
+    pathTickSlider.addEventListener('input', e => {
+        pathTick = +(e.target as HTMLInputElement).value;
+    })
 
     let mousePressed = false;
 
@@ -140,7 +156,7 @@ async function main() {
     let curveColorBuffer = gl.createBuffer()!;
     let numCurvePoints = 0;
     let curveSlider = document.querySelector("#curve_t") as HTMLInputElement;
-    let curveTolerance = +curveSlider.value / 1000;
+    let curveTolerance = +curveSlider.value;
     let curve: AdaptiveCurve | null = null;
 
     function updateCurvePoints() {
@@ -159,7 +175,7 @@ async function main() {
     updateCurvePoints();
 
     curveSlider.addEventListener('input', e => {
-        curveTolerance = +(e.target as HTMLInputElement).value / 1000;
+        curveTolerance = +(e.target as HTMLInputElement).value;
         updateCurvePoints();
     })
 
@@ -175,10 +191,10 @@ async function main() {
         let anim = sceneState.animIndex >= 0 ? scene.animations[sceneState.animIndex] : null;
 
         if (autoPlayAnim.checked && anim) {
-            sceneState.tick += (dt * anim.ticksPerSecond * 0.3);
-            sceneState.tick %= anim.duration;
+            sceneState.animTick += (dt * anim.ticksPerSecond * animSpeed);
+            sceneState.animTick %= anim.duration;
         }
-        tickSlider.value = (anim ? sceneState.tick / anim.duration * 1000 : 0).toString();
+        animTickSlider.value = (anim ? sceneState.animTick / anim.duration : 0).toString();
 
         sceneState.drawBones = drawBonesButton.checked;
         sceneState.updateTransforms(scene);
@@ -193,18 +209,26 @@ async function main() {
         R.gl.viewport(0, 0, R.canvas.width, R.canvas.height);
 
         let camHeight = 1;
+        let camOrbitCenter: M.Vec3 = [0, camHeight, -100];
         let camPos: M.Vec3 = [0, 0, 0];
         camPos[0] = Math.sin(camTheta * Math.PI / 180) * Math.cos(camPhi * Math.PI / 180) * camDistance;
-        camPos[1] = camHeight + Math.cos(camTheta * Math.PI / 180) * camDistance;
+        camPos[1] = Math.cos(camTheta * Math.PI / 180) * camDistance;
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
+        camPos = M.vec3Add(camPos, camOrbitCenter);
 
-        let t = +tickSlider.value / 1000;
+        if (autoMove.checked) {
+            pathTick += dt * (pathSpeed * 0.1);
+            pathTick %= 1;
+        }
+        pathTickSlider.value= pathTick.toString();
+        // console.log(animTickSlider.value);
+        let t = pathTick;
         let arcLength = t * curve!.maxArcLength;
         t = curve!.getT(arcLength)!;
         let modelPos = interpolateCurvePosition(controlPoints, t);
         let modelRot = mat4Transpose(mat4LookAt([0, 0, 0], vec3Negate(interpolateCurveDirection(controlPoints, t)), [0, 1, 0]));
         let modelMat = mat4Multiply(mat4Translate(modelPos), mat4Multiply(modelRot, mat4Scale([0.1, 0.1, 0.1])));
-        let viewMat = M.mat4LookAt(camPos, [0, camHeight, 0], [0, 1, 0]);
+        let viewMat = M.mat4LookAt(camPos, camOrbitCenter, [0, 1, 0]);
         let projMat = M.mat4Perspective();
 
         if (drawModelButton.checked) {
@@ -214,6 +238,8 @@ async function main() {
         if (sceneState.drawBones) {
             debugBoneBuffer.draw(debugBonesShaderProgram, modelMat, viewMat, projMat);
         }
+
+        console.log(animSpeedSlider.value, pathSpeedSlider.value, curveTolerance);
 
         R.gl.useProgram(unlitProgram.handle);
         R.setUniforms(unlitProgram, {

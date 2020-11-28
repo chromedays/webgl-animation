@@ -308,7 +308,7 @@ export function interpolateKeyframes<T>(keyframes: KeyFrame<T>[], tick: number, 
 
 export class SceneState {
     animIndex = -1;
-    tick = 0;
+    animTick = 0;
     drawBones = false;
     nodeTransforms: M.Mat4[] = [];
     boneTransforms: M.Mat4[][] = [];
@@ -329,9 +329,9 @@ export class SceneState {
             if (node.hasParent()) {
                 if (anim && anim.channels.has(node.name)) {
                     let channel = anim.channels.get(node.name)!;
-                    let v = interpolateKeyframes(channel.positionKeys, this.tick, M.vec3Lerp);
-                    let q = interpolateKeyframes(channel.rotationKeys, this.tick, M.quatSlerp);
-                    let s = interpolateKeyframes(channel.scalingKeys, this.tick, M.vec3Lerp);
+                    let v = interpolateKeyframes(channel.positionKeys, this.animTick, M.vec3Lerp);
+                    let q = interpolateKeyframes(channel.rotationKeys, this.animTick, M.quatSlerp);
+                    let s = interpolateKeyframes(channel.scalingKeys, this.animTick, M.vec3Lerp);
                     let localTransform = M.mat4Multiply(M.mat4Translate(v), M.mat4Multiply(M.quatToMat4(q), M.mat4Scale(s)));
                     this.nodeTransforms[nodeIndex] = M.mat4Multiply(this.nodeTransforms[node.parentIndex], localTransform);
                 } else {
