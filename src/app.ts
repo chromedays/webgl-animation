@@ -97,6 +97,8 @@ async function main() {
     let pathSpeed = +pathSpeedSlider.value;
     pathSpeedSlider.addEventListener('input', e=> {
         pathSpeed = +(e.target as HTMLInputElement).value;
+        animSpeed = pathSpeed * 1.163 / 0.508;
+        animSpeedSlider.value = animSpeed.toString();
     })
     let pathTickSlider = document.querySelector('#path_tick') as HTMLInputElement;
     let pathTick = 0;
@@ -216,11 +218,12 @@ async function main() {
         camPos[2] = Math.sin(camTheta * Math.PI / 180) * Math.sin(camPhi * Math.PI / 180) * camDistance;
         camPos = M.vec3Add(camPos, camOrbitCenter);
 
+        const speed = dt * (pathSpeed * 0.1);
         if (autoMove.checked) {
-            pathTick += dt * (pathSpeed * 0.1);
+            pathTick += speed;
             pathTick %= 1;
         }
-        pathTickSlider.value= pathTick.toString();
+        pathTickSlider.value = pathTick.toString();
         // console.log(animTickSlider.value);
         let t = pathTick;
         let arcLength = t * curve!.maxArcLength;
